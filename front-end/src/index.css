@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Impression thermique ─────────────────────────────────────────────────── */
+@media print {
+  /* Tout cacher par défaut */
+  body * {
+    visibility: hidden;
+  }
+  /* Seul le ticket est visible */
+  #print-section,
+  #print-section * {
+    visibility: visible;
+  }
+  /* Le positionner en haut à gauche, format 80 mm */
+  #print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    padding: 10px;
+  }
+  /* Supprimer les marges du navigateur */
+  @page {
+    margin: 0;
+  }
+}
