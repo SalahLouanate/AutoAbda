@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import DashboardReception from '../components/DashboardReception'
 import FileAttenteView from '../components/FileAttenteView'
-import HistoriqueSAVView from '../components/HistoriqueSAVView'
+import HistoriqueRetoursView from '../views/reception/HistoriqueRetoursView'
 
 const NAV_ITEMS = [
   {
@@ -61,7 +61,7 @@ function PlaceholderView({ title, desc }) {
 const VIEWS = {
   prise_en_charge: <DashboardReception />,
   file_attente: <FileAttenteView />,
-  historique: <HistoriqueSAVView />,
+  historique: <HistoriqueRetoursView />,
 }
 
 // ─── Layout ────────────────────────────────────────────────────────────────────

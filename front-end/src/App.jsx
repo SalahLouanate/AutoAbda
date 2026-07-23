@@ -1,5 +1,5 @@
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Login from './pages/Login'
+import LoginView from './views/auth/LoginView'
 import ReceptionLayout from './layouts/ReceptionLayout'
 import TechnicianLayout from './layouts/TechnicianLayout'
 import DirectionLayout from './layouts/DirectionLayout'
@@ -16,7 +16,7 @@ function AppRouter() {
   const { user } = useAuth()
 
   // Not authenticated → Login page
-  if (!user) return <Login />
+  if (!user) return <LoginView />
 
   // Authenticated → render matching layout
   const layout = LAYOUT_MAP[user.role]

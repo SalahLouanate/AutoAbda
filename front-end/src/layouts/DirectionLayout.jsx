@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import DashboardDirectionView      from '../views/direction/DashboardDirectionView'
+import CatalogueInterventionsView  from '../views/direction/CatalogueInterventionsView'
+import GestionRessourcesView       from '../views/direction/GestionRessourcesView'
+import PerformancesRentabiliteView from '../views/direction/PerformancesRentabiliteView'
 
 const NAV_ITEMS = [
   {
@@ -36,9 +40,20 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'ressources',
+    step: '04',
+    label: 'Gestion des Ressources',
+    desc: 'Personnel & infrastructures',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.49 15.326a.78.78 0 0 1-.358-.442 3 3 0 0 1 4.308-3.516 6.484 6.484 0 0 0-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 0 1-2.07-.655ZM16.44 15.98a4.97 4.97 0 0 0 2.07-.654.78.78 0 0 0 .357-.442 3 3 0 0 0-4.308-3.517 6.484 6.484 0 0 1 1.907 3.96 2.32 2.32 0 0 1-.026.654ZM18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM5.304 16.19a.844.844 0 0 1-.277-.71 5 5 0 0 1 9.947 0 .843.843 0 0 1-.277.71A6.975 6.975 0 0 1 10 18a6.974 6.974 0 0 1-4.696-1.81Z" />
+      </svg>
+    ),
+  },
 ]
 
-// ─── Placeholder views ─────────────────────────────────────────────────────────
+// ─── Placeholder view ────────────────────────────────────────────────────────
 function PlaceholderView({ title, desc }) {
   return (
     <div className="flex flex-col items-center justify-center h-96 gap-4 text-slate-400">
@@ -56,49 +71,11 @@ function PlaceholderView({ title, desc }) {
   )
 }
 
-function DashboardView() {
-  return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Dashboard Temps Réel</h1>
-        <p className="text-slate-500 mt-1 text-sm">Vue d'ensemble de l'activité du garage.</p>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'CA ce mois', value: '24 800 €', delta: '+12%', up: true, bg: 'bg-emerald-50', accent: 'text-emerald-600', border: 'border-emerald-200' },
-          { label: 'Véhicules traités', value: '143', delta: '+8%', up: true, bg: 'bg-blue-50', accent: 'text-blue-600', border: 'border-blue-200' },
-          { label: 'Satisfaction', value: '97%', delta: '+2%', up: true, bg: 'bg-yellow-50', accent: 'text-yellow-700', border: 'border-yellow-200' },
-          { label: 'Délai moyen', value: '1.4 j', delta: '-5%', up: false, bg: 'bg-rose-50', accent: 'text-rose-600', border: 'border-rose-200' },
-        ].map((kpi) => (
-          <div key={kpi.label} className={`${kpi.bg} border ${kpi.border} rounded-2xl p-5`}>
-            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2">{kpi.label}</p>
-            <p className={`text-3xl font-black ${kpi.accent}`}>{kpi.value}</p>
-            <span className={`text-xs font-bold mt-1 inline-block ${kpi.up ? 'text-emerald-600' : 'text-rose-500'}`}>
-              {kpi.up ? '▲' : '▼'} {kpi.delta}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-6">Activité hebdomadaire (véhicules)</h2>
-        <div className="flex items-end gap-3 h-40">
-          {[{ day: 'Lun', val: 8 }, { day: 'Mar', val: 12 }, { day: 'Mer', val: 6 }, { day: 'Jeu', val: 15 }, { day: 'Ven', val: 10 }, { day: 'Sam', val: 4 }].map((d) => (
-            <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
-              <span className="text-xs font-bold text-slate-500">{d.val}</span>
-              <div className="w-full rounded-t-lg bg-yellow-400 hover:bg-yellow-300 transition-colors" style={{ height: `${(d.val / 15) * 100}%` }} />
-              <span className="text-xs text-slate-400">{d.day}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 const VIEWS = {
-  dashboard: <DashboardView />,
-  catalogue: <PlaceholderView title="Catalogue & Barèmes" desc="Gestion des prestations, pièces et tarification." />,
-  bilan: <PlaceholderView title="Bilan Mensuel & Primes" desc="Calcul des primes, export et synthèse mensuelle." />,
+  dashboard:   <DashboardDirectionView />,
+  catalogue:   <CatalogueInterventionsView />,
+  bilan:       <PerformancesRentabiliteView />,
+  ressources:  <GestionRessourcesView />,
 }
 
 // ─── Layout ────────────────────────────────────────────────────────────────────
