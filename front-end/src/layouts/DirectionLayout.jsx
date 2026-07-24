@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import DashboardDirectionView      from '../views/direction/DashboardDirectionView'
+import SupervisionQuotidienneView  from '../views/direction/SupervisionQuotidienneView'
 import CatalogueInterventionsView  from '../views/direction/CatalogueInterventionsView'
 import GestionRessourcesView       from '../views/direction/GestionRessourcesView'
 import PerformancesRentabiliteView from '../views/direction/PerformancesRentabiliteView'
+import MonProfilView               from '../views/direction/MonProfilView'
 
 const NAV_ITEMS = [
   {
@@ -18,8 +20,20 @@ const NAV_ITEMS = [
     ),
   },
   {
-    id: 'catalogue',
+    id: 'supervision',
     step: '02',
+    label: 'Supervision Quotidienne',
+    desc: 'Tour de contrôle atelier',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+        <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.147.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
+    id: 'catalogue',
+    step: '03',
     label: 'Catalogue & Barèmes',
     desc: 'Tarifs & prestations',
     icon: (
@@ -30,7 +44,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'bilan',
-    step: '03',
+    step: '04',
     label: 'Bilan Mensuel & Primes',
     desc: 'Performance & rémunération',
     icon: (
@@ -42,7 +56,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'ressources',
-    step: '04',
+    step: '05',
     label: 'Gestion des Ressources',
     desc: 'Personnel & infrastructures',
     icon: (
@@ -53,29 +67,13 @@ const NAV_ITEMS = [
   },
 ]
 
-// ─── Placeholder view ────────────────────────────────────────────────────────
-function PlaceholderView({ title, desc }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-96 gap-4 text-slate-400">
-      <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-300">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-        </svg>
-      </div>
-      <div className="text-center">
-        <p className="font-semibold text-slate-600 text-base">{title}</p>
-        <p className="text-sm text-slate-400 mt-1">{desc}</p>
-        <span className="inline-block mt-3 px-3 py-1 rounded-full bg-slate-100 text-slate-400 text-xs font-medium">En construction</span>
-      </div>
-    </div>
-  )
-}
-
 const VIEWS = {
   dashboard:   <DashboardDirectionView />,
+  supervision: <SupervisionQuotidienneView />,
   catalogue:   <CatalogueInterventionsView />,
   bilan:       <PerformancesRentabiliteView />,
   ressources:  <GestionRessourcesView />,
+  profil:      <MonProfilView />,
 }
 
 // ─── Layout ────────────────────────────────────────────────────────────────────
@@ -136,16 +134,23 @@ export default function DirectionLayout() {
 
         {/* User footer */}
         <div className="px-4 py-4 border-t border-slate-700/50 flex flex-col gap-3">
-          <div className="flex items-center gap-3 px-1">
+          <button
+            onClick={() => setActiveView('profil')}
+            className={`flex items-center gap-3 px-1 w-full rounded-xl p-2 text-left transition-all ${
+              activeView === 'profil' ? 'bg-yellow-400/10' : 'hover:bg-slate-800'
+            }`}
+          >
             <div className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
               <span className="text-slate-900 font-black text-xs">{user?.name?.charAt(0) ?? 'D'}</span>
             </div>
-            <div className="min-w-0">
-              <p className="text-slate-200 text-xs font-semibold truncate">{user?.name ?? 'Chef d\'Atelier'}</p>
-              <p className="text-yellow-400/70 text-xs truncate">Direction</p>
+            <div className="min-w-0 flex-1">
+              <p className={`text-xs font-semibold truncate ${activeView === 'profil' ? 'text-yellow-400' : 'text-slate-200'}`}>{user?.name ?? 'Chef d\'Atelier'}</p>
+              <p className="text-yellow-400/70 text-xs truncate">Mon profil &amp; paramètres</p>
             </div>
-            <div className="ml-auto w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-          </div>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-slate-600 shrink-0">
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clipRule="evenodd" />
+            </svg>
+          </button>
           <button onClick={logout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-700 text-slate-500 hover:text-rose-400 hover:border-rose-400/30 hover:bg-rose-400/5 text-xs font-medium transition-all cursor-pointer">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
               <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 0 1 5.25 2h5.5A2.25 2.25 0 0 1 13 4.25v2a.75.75 0 0 1-1.5 0v-2a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75v-2a.75.75 0 0 1 1.5 0v2A2.25 2.25 0 0 1 10.75 18h-5.5A2.25 2.25 0 0 1 3 15.75V4.25Z" clipRule="evenodd" />

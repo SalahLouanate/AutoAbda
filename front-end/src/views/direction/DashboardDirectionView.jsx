@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DONNÉES STATIQUES — 7 ponts de l'atelier
+// DONNÉES STATIQUES — 5 ponts de l'atelier
 // ─────────────────────────────────────────────────────────────────────────────
 const PONTS_INITIAL = [
   {
@@ -26,19 +26,17 @@ const PONTS_INITIAL = [
     tempsBareme: 30,
     tempsPasse: 45,
   },
-  { id: 3, label: 'Pont 3', statut: 'libre', technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
-  { id: 4, label: 'Pont 4', statut: 'libre', technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
-  { id: 5, label: 'Pont 5', statut: 'libre', technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
   {
-    id: 6, label: 'Pont 6',
+    id: 3, label: 'Pont 3',
     statut: 'occupe',
-    technicien: 'Technicien 3',
+    technicien: 'Karim Amrani',
     vehicule: 'AB-123-CD',
     intervention: 'Plaquettes',
     tempsBareme: 90,
     tempsPasse: 10,
   },
-  { id: 7, label: 'Pont 7', statut: 'maintenance', technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
+  { id: 4, label: 'Pont 4', statut: 'libre',       technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
+  { id: 5, label: 'Pont 5', statut: 'maintenance', technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,11 +48,8 @@ const getPct   = (p) => p.tempsBareme > 0 ? Math.min(100, Math.round((p.tempsPas
 // ─────────────────────────────────────────────────────────────────────────────
 // ICÔNES SVG inline
 // ─────────────────────────────────────────────────────────────────────────────
-const IcoUser = ({ cls = 'h-4 w-4' }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
-  </svg>
-)
+
+
 const IcoCar = ({ cls = 'h-4 w-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 17h8M3 11l2-5h14l2 5M3 11h18v6H3v-6zm3 6v1a1 1 0 002 0v-1m8 0v1a1 1 0 002 0v-1"/>
@@ -117,7 +112,7 @@ function OccupationDonut({ ponts }) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-slate-700">Taux d'occupation</h2>
-          <p className="text-xs text-slate-400 mt-0.5">État des 7 ponts en ce moment</p>
+          <p className="text-xs text-slate-400 mt-0.5">État des {ponts.length} ponts en ce moment</p>
         </div>
         <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
           {pctOccupe}% utilisé
@@ -364,7 +359,7 @@ export default function DashboardDirectionView() {
         {/* ── KPI STRIP ──────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Ponts occupés',   value: `${occupes} / 7`, sub: 'actuellement actifs',      color: 'blue',   icon: <IcoCar cls="h-5 w-5"   /> },
+            { label: 'Ponts occupés',   value: `${occupes} / ${ponts.length}`, sub: 'actuellement actifs',      color: 'blue',   icon: <IcoCar cls="h-5 w-5"   /> },
             { label: 'Ponts libres',    value: libres,            sub: 'disponibles maintenant',   color: 'emerald',icon: <IcoCheck cls="h-5 w-5"  /> },
             { label: 'En retard',       value: enRetard,          sub: enRetard > 0 ? 'dépassement détecté' : 'aucun dépassement', color: enRetard > 0 ? 'red' : 'slate', icon: <IcoAlert cls="h-5 w-5"  /> },
             { label: 'Maintenance',     value: maint,             sub: 'hors service aujourd\'hui', color: 'slate',  icon: <IcoGear cls="h-5 w-5"   /> },
@@ -391,7 +386,7 @@ export default function DashboardDirectionView() {
         {/* ── GRILLE 7 PONTS ──────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-slate-700">Supervision des 7 Ponts</h2>
+          <h2 className="text-base font-bold text-slate-700">Supervision des {ponts.length} Ponts</h2>
             <div className="hidden sm:flex items-center gap-4 text-xs text-slate-400">
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block"/>En cours</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"/>Libre</span>
@@ -399,7 +394,7 @@ export default function DashboardDirectionView() {
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"/>Maintenance</span>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {ponts.map(pont => (
               <PontCard key={pont.id} pont={pont} />
             ))}

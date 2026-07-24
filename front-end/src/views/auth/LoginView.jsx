@@ -1,16 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, Quote, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-
-const MOCK_USERS = {
-  'reception@autoabda.ma': { role: 'receptionniste', name: 'Samia R.' },
-  'tech@autoabda.ma':      { role: 'technicien',     name: 'Karim B.' },
-  'chef@autoabda.ma':      { role: 'chef_atelier',   name: 'M. Abda' },
-}
-
+import api from '../../api/axios'
 
 export default function LoginView() {
   const auth = useAuth()
+  const navigate = useNavigate()
 
   const [email, setEmail]               = useState('')
   const [password, setPassword]         = useState('')
@@ -29,24 +25,32 @@ export default function LoginView() {
     }
 
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 400))
 
-    const cleanEmail = email.trim().toLowerCase()
-    const match = MOCK_USERS[cleanEmail]
+    try {
+      const response = await api.post('/login', {
+        email: email.trim(),
+        password,
+      })
 
-    if (auth?.login) {
-      if (match) {
-        auth.login({ email: cleanEmail, role: match.role, name: match.name })
-      } else {
-        auth.login({
-          email: cleanEmail,
-          role: 'chef_atelier',
-          name: cleanEmail.split('@')[0] || 'Chef d\'Atelier',
-        })
+      const { token, user } = response.data
+
+      localStorage.setItem('token', token)
+      localStorage.setItem('user', JSON.stringify(user))
+
+      if (auth?.login) {
+        auth.login(user)
       }
-    }
 
-    setLoading(false)
+      if (user.role === 'technicien') {
+        navigate('/technicien')
+      } else {
+        navigate('/direction/dashboard')
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Identifiants invalides')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

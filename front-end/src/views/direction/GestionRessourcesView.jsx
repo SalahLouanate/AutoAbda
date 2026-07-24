@@ -4,8 +4,12 @@ import { useState } from 'react'
 // MOCK DATA
 // ─────────────────────────────────────────────────────────────────────────────
 const INITIAL_TECHNICIENS = [
-  { id: 1, nom: 'Yassir Zimi',        pontDefaut: 'Pont 1', statutJour: 'Présent',  actif: true },
-  { id: 2, nom: 'Meraouni Mustapha',  pontDefaut: 'Pont 2', statutJour: 'En congé', actif: true },
+  { id: 1, nom: 'Yassir Zimi',       role: 'Technicien',     pontDefaut: 'Pont 1', statutJour: 'Présent',  actif: true, email: 'y.zimi@autoabda.ma',       motDePasse: 'Tech@1234' },
+  { id: 2, nom: 'Meraouni Mustapha', role: 'Technicien',     pontDefaut: 'Pont 2', statutJour: 'En congé', actif: true, email: 'm.mustapha@autoabda.ma',   motDePasse: 'Tech@5678' },
+  { id: 3, nom: 'Karim Amrani',      role: 'Technicien',     pontDefaut: 'Pont 3', statutJour: 'Présent',  actif: true, email: 'k.amrani@autoabda.ma',     motDePasse: 'Tech@9012' },
+  { id: 4, nom: 'Hamza Bennani',     role: 'Technicien',     pontDefaut: 'Pont 4', statutJour: 'Présent',  actif: true, email: 'h.bennani@autoabda.ma',    motDePasse: 'Tech@3456' },
+  { id: 5, nom: 'Sofiane Touati',    role: 'Technicien',     pontDefaut: 'Pont 5', statutJour: 'Absent',   actif: true, email: 's.touati@autoabda.ma',     motDePasse: 'Tech@7890' },
+  { id: 6, nom: 'Sara Benmoussa',    role: 'Réceptionniste', pontDefaut: null,     statutJour: 'Présent',  actif: true, email: 's.benmoussa@autoabda.ma',  motDePasse: 'Recep@1234' },
 ]
 
 const INITIAL_PONTS = [
@@ -14,8 +18,6 @@ const INITIAL_PONTS = [
   { id: 3, nom: 'Pont 3', statut: 'En maintenance' },
   { id: 4, nom: 'Pont 4', statut: 'Opérationnel' },
   { id: 5, nom: 'Pont 5', statut: 'Opérationnel' },
-  { id: 6, nom: 'Pont 6', statut: 'Opérationnel' },
-  { id: 7, nom: 'Pont 7', statut: 'Opérationnel' },
 ]
 
 const STATUTS_JOUR = ['Présent', 'Absent', 'En congé']
@@ -72,6 +74,27 @@ function IcoUser({ cls = 'h-8 w-8' }) {
     </svg>
   )
 }
+function IcoKey({ cls = 'h-4 w-4' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 0 1 21.75 8.25Z" />
+    </svg>
+  )
+}
+function IcoRefresh({ cls = 'h-3.5 w-3.5' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+    </svg>
+  )
+}
+function IcoCopy({ cls = 'h-3.5 w-3.5' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+    </svg>
+  )
+}
 function IcoCar({ cls = 'h-6 w-6' }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -113,20 +136,36 @@ function BadgeStatutJour({ statut }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MODALE — Ajout / Édition technicien
 // ─────────────────────────────────────────────────────────────────────────────
-const PONTS_OPTIONS = ['Pont 1', 'Pont 2', 'Pont 3', 'Pont 4', 'Pont 5', 'Pont 6', 'Pont 7']
+const PONTS_OPTIONS = ['Pont 1', 'Pont 2', 'Pont 3', 'Pont 4', 'Pont 5']
+const ROLES_OPTIONS = ['Technicien', 'Réceptionniste']
+
+// Helper : génère un mot de passe aléatoire
+function genererMotDePasse() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!'
+  return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
 
 function TechnicienModal({ isOpen, editTarget, onClose, onSave }) {
   const isEdit = Boolean(editTarget)
   const [nom,        setNom]        = useState(editTarget?.nom        ?? '')
+  const [role,       setRole]       = useState(editTarget?.role       ?? 'Technicien')
   const [pontDefaut, setPontDefaut] = useState(editTarget?.pontDefaut ?? 'Pont 1')
+  const [email,      setEmail]      = useState(editTarget?.email      ?? '')
+  const [motDePasse, setMotDePasse] = useState(editTarget?.motDePasse ?? '')
+  const [copied,     setCopied]     = useState(false)
   const [errors,     setErrors]     = useState({})
 
   // Reset à chaque ouverture
   if (!isOpen) return null
 
+  const isTechnicien = role === 'Technicien'
+
   function validate() {
     const e = {}
     if (!nom.trim()) e.nom = 'Le nom est obligatoire.'
+    if (!email.trim()) e.email = 'L\'email de connexion est obligatoire.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Format d\'email invalide.'
+    if (!motDePasse.trim()) e.motDePasse = 'Le mot de passe provisoire est obligatoire.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -134,7 +173,27 @@ function TechnicienModal({ isOpen, editTarget, onClose, onSave }) {
   function handleSubmit(e) {
     e.preventDefault()
     if (!validate()) return
-    onSave({ nom: nom.trim(), pontDefaut })
+    onSave({
+      nom: nom.trim(),
+      role,
+      pontDefaut: isTechnicien ? pontDefaut : null,
+      email: email.trim(),
+      motDePasse: motDePasse.trim(),
+    })
+  }
+
+  function handleGenerer() {
+    setMotDePasse(genererMotDePasse())
+    setErrors(v => ({ ...v, motDePasse: '' }))
+    setCopied(false)
+  }
+
+  function handleCopier() {
+    if (!motDePasse) return
+    navigator.clipboard.writeText(motDePasse).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
   }
 
   return (
@@ -143,7 +202,7 @@ function TechnicienModal({ isOpen, editTarget, onClose, onSave }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
         style={{ animation: 'modalIn .18s ease-out' }}
         onClick={e => e.stopPropagation()}
       >
@@ -151,10 +210,10 @@ function TechnicienModal({ isOpen, editTarget, onClose, onSave }) {
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-800">
-              {isEdit ? 'Modifier le technicien' : 'Nouveau technicien'}
+              {isEdit ? 'Modifier le membre du personnel' : 'Nouveau membre du personnel'}
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              {isEdit ? `Édition de : ${editTarget.nom}` : 'Ajout à l\'équipe technique'}
+              {isEdit ? `Édition de : ${editTarget.nom}` : 'Ajout à l\'équipe'}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
@@ -163,39 +222,140 @@ function TechnicienModal({ isOpen, editTarget, onClose, onSave }) {
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
-          <div className="px-6 py-6 space-y-5">
-            {/* Nom */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                Nom complet <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={nom}
-                onChange={e => { setNom(e.target.value); setErrors(v => ({ ...v, nom: '' })) }}
-                placeholder="Prénom Nom"
-                className={`w-full text-sm text-slate-700 bg-slate-50 border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:bg-white transition
-                  ${errors.nom ? 'border-red-400 focus:ring-red-300' : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400'}`}
-              />
-              {errors.nom && <p className="text-xs text-red-500 mt-1">{errors.nom}</p>}
-            </div>
+          <div className="px-6 py-5">
 
-            {/* Pont par défaut */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                Pont par défaut
-              </label>
-              <select
-                value={pontDefaut}
-                onChange={e => setPontDefaut(e.target.value)}
-                className="w-full text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition cursor-pointer"
-              >
-                {PONTS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+            {/* Grille principale 2 colonnes */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+
+              {/* Ligne 1 — Nom complet + Rôle */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Nom complet <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={nom}
+                  onChange={e => { setNom(e.target.value); setErrors(v => ({ ...v, nom: '' })) }}
+                  placeholder="Prénom Nom"
+                  className={`w-full text-sm text-slate-700 bg-slate-50 border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:bg-white transition
+                    ${errors.nom ? 'border-red-400 focus:ring-red-300' : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400'}`}
+                />
+                {errors.nom && <p className="text-xs text-red-500 mt-1">{errors.nom}</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Rôle
+                </label>
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value)}
+                  className="w-full text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition cursor-pointer"
+                >
+                  {ROLES_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              {/* Ligne 2 — Pont par défaut (Technicien uniquement, pleine largeur) */}
+              {isTechnicien && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Pont par défaut
+                  </label>
+                  <select
+                    value={pontDefaut}
+                    onChange={e => setPontDefaut(e.target.value)}
+                    className="w-full text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition cursor-pointer"
+                  >
+                    {PONTS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Ligne 3 — Zone identifiants (pleine largeur) */}
+              <div className="col-span-2">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+                    <IcoKey cls="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Identifiants de connexion</span>
+                  </div>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+
+                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+                  <div className="grid grid-cols-2 gap-4">
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Email de connexion <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={e => { setEmail(e.target.value); setErrors(v => ({ ...v, email: '' })) }}
+                        placeholder="prenom.nom@autoabda.ma"
+                        className={`w-full text-sm text-slate-700 bg-white border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:bg-white transition
+                          ${errors.email ? 'border-red-400 focus:ring-red-300' : 'border-blue-200 focus:ring-blue-400 focus:border-blue-400'}`}
+                      />
+                      {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                    </div>
+
+                    {/* Mot de passe */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Mot de passe (Provisoire) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={motDePasse}
+                          onChange={e => { setMotDePasse(e.target.value); setErrors(v => ({ ...v, motDePasse: '' })) }}
+                          placeholder="Mot de passe temporaire"
+                          className={`flex-1 text-sm font-mono text-slate-700 bg-white border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:bg-white transition min-w-0
+                            ${errors.motDePasse ? 'border-red-400 focus:ring-red-300' : 'border-blue-200 focus:ring-blue-400 focus:border-blue-400'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleGenerer}
+                          title="Générer un mot de passe aléatoire"
+                          className="p-2.5 rounded-xl bg-white border border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400 transition-colors flex-shrink-0"
+                        >
+                          <IcoRefresh />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCopier}
+                          title="Copier le mot de passe"
+                          className={`p-2.5 rounded-xl border transition-colors flex-shrink-0 ${
+                            copied
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                              : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50 hover:border-blue-400'
+                          }`}
+                        >
+                          {copied ? <IcoCheck cls="h-3.5 w-3.5" /> : <IcoCopy />}
+                        </button>
+                      </div>
+                      {errors.motDePasse && <p className="text-xs text-red-500 mt-1">{errors.motDePasse}</p>}
+                    </div>
+
+                  </div>
+
+                  {/* Texte d'aide (pleine largeur sous la grille) */}
+                  <p className="text-[11px] text-slate-500 mt-3 leading-relaxed flex items-start gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                    </svg>
+                    Le membre du personnel utilisera cet email et ce mot de passe pour se connecter à son espace.
+                  </p>
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <div className="px-6 pb-6 flex gap-3">
+          <div className="px-6 pb-5 flex gap-3">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 active:scale-95 transition-all">
               Annuler
@@ -233,12 +393,14 @@ export default function GestionRessourcesView() {
   const openCreate = () => { setEditTarget(null); setModalOpen(true) }
   const openEdit   = (t)  => { setEditTarget(t);  setModalOpen(true) }
 
-  const handleSave = ({ nom, pontDefaut }) => {
+  const handleSave = ({ nom, role, pontDefaut, email, motDePasse }) => {
     if (editTarget) {
-      setTechniciens(prev => prev.map(t => t.id === editTarget.id ? { ...t, nom, pontDefaut } : t))
+      setTechniciens(prev => prev.map(t =>
+        t.id === editTarget.id ? { ...t, nom, role, pontDefaut, email, motDePasse } : t
+      ))
     } else {
       const newId = Math.max(0, ...techniciens.map(t => t.id)) + 1
-      setTechniciens(prev => [...prev, { id: newId, nom, pontDefaut, statutJour: 'Présent', actif: true }])
+      setTechniciens(prev => [...prev, { id: newId, nom, role, pontDefaut, email, motDePasse, statutJour: 'Présent', actif: true }])
     }
     setModalOpen(false)
   }
@@ -378,7 +540,7 @@ export default function GestionRessourcesView() {
               className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-300 active:scale-95 text-slate-900 font-bold text-xs rounded-xl shadow-md shadow-yellow-400/30 transition-all flex-shrink-0"
             >
               <IcoPlus />
-              Ajouter un technicien
+              Ajouter un personnel
             </button>
           </div>
 
@@ -386,9 +548,10 @@ export default function GestionRessourcesView() {
           <div className="overflow-hidden rounded-xl border border-slate-200">
             {/* En-têtes */}
             <div className="grid grid-cols-12 px-4 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              <div className="col-span-4">Nom</div>
-              <div className="col-span-3">Pont par défaut</div>
-              <div className="col-span-3 text-center">Statut Contrat</div>
+              <div className="col-span-3">Nom</div>
+              <div className="col-span-2">Rôle</div>
+              <div className="col-span-3">Email / Pont</div>
+              <div className="col-span-2 text-center">Statut</div>
               <div className="col-span-2 text-right">Actions</div>
             </div>
 
@@ -405,7 +568,7 @@ export default function GestionRessourcesView() {
                     className={`grid grid-cols-12 items-center px-4 py-3.5 hover:bg-slate-50/70 transition-colors ${!tech.actif ? 'opacity-50' : ''}`}
                   >
                     {/* Nom */}
-                    <div className="col-span-4 flex items-center gap-3">
+                    <div className="col-span-3 flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
                         ${tech.actif ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-400'}`}>
                         {tech.nom.charAt(0)}
@@ -413,13 +576,25 @@ export default function GestionRessourcesView() {
                       <p className="text-sm font-semibold text-slate-800 truncate">{tech.nom}</p>
                     </div>
 
-                    {/* Pont */}
+                    {/* Rôle */}
+                    <div className="col-span-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                        tech.role === 'Technicien'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : 'bg-purple-50 text-purple-700 border-purple-200'
+                      }`}>
+                        {tech.role ?? 'Technicien'}
+                      </span>
+                    </div>
+
+                    {/* Email / Pont */}
                     <div className="col-span-3">
-                      <span className="text-xs text-slate-500 font-medium">{tech.pontDefaut}</span>
+                      <p className="text-xs text-slate-700 font-medium truncate">{tech.email ?? <span className="text-slate-400 italic">—</span>}</p>
+                      <p className="text-xs text-slate-400">{tech.pontDefaut ?? <span className="italic">—</span>}</p>
                     </div>
 
                     {/* Statut contrat */}
-                    <div className="col-span-3 flex justify-center">
+                    <div className="col-span-2 flex justify-center">
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
                         tech.actif
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -475,7 +650,7 @@ export default function GestionRessourcesView() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {ponts.map(pont => {
               const isOk = pont.statut === 'Opérationnel'
               return (

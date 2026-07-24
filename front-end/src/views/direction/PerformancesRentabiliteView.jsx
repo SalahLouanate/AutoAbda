@@ -5,26 +5,22 @@ import {
 } from 'recharts'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA — 7 Techniciens avec données stables
+// MOCK DATA — 5 Techniciens (configuration réelle du garage)
 // ─────────────────────────────────────────────────────────────────────────────
 const DONNEES_JOUR = [
   { id: 1, nom: 'Yassir Zimi',       heuresAchetees: 8, heuresFacturees: 9.5, retoursSAV: 0, penaliteSAV: 0   },
   { id: 2, nom: 'Meraouni Mustapha', heuresAchetees: 8, heuresFacturees: 6.0, retoursSAV: 1, penaliteSAV: 2   },
-  { id: 3, nom: 'Ahmed Benali',      heuresAchetees: 8, heuresFacturees: 8.5, retoursSAV: 0, penaliteSAV: 0   },
-  { id: 4, nom: 'Karim Ouazzani',    heuresAchetees: 8, heuresFacturees: 7.5, retoursSAV: 0, penaliteSAV: 0   },
-  { id: 5, nom: 'Hassan Idrissi',    heuresAchetees: 8, heuresFacturees: 7.0, retoursSAV: 1, penaliteSAV: 1.5 },
-  { id: 6, nom: 'Rachid Bouhali',    heuresAchetees: 8, heuresFacturees: 10.0,retoursSAV: 0, penaliteSAV: 0   },
-  { id: 7, nom: 'Omar Tazi',         heuresAchetees: 8, heuresFacturees: 8.0, retoursSAV: 0, penaliteSAV: 0   },
+  { id: 3, nom: 'Karim Amrani',      heuresAchetees: 8, heuresFacturees: 8.5, retoursSAV: 0, penaliteSAV: 0   },
+  { id: 4, nom: 'Hamza Bennani',     heuresAchetees: 8, heuresFacturees: 7.0, retoursSAV: 1, penaliteSAV: 1.5 },
+  { id: 5, nom: 'Sofiane Touati',    heuresAchetees: 8, heuresFacturees: 9.0, retoursSAV: 0, penaliteSAV: 0   },
 ]
 
 const DONNEES_MOIS = [
   { id: 1, nom: 'Yassir Zimi',       heuresAchetees: 160, heuresFacturees: 185, retoursSAV: 1, penaliteSAV: 2 },
   { id: 2, nom: 'Meraouni Mustapha', heuresAchetees: 160, heuresFacturees: 130, retoursSAV: 3, penaliteSAV: 6 },
-  { id: 3, nom: 'Ahmed Benali',      heuresAchetees: 160, heuresFacturees: 168, retoursSAV: 1, penaliteSAV: 2 },
-  { id: 4, nom: 'Karim Ouazzani',    heuresAchetees: 160, heuresFacturees: 172, retoursSAV: 0, penaliteSAV: 0 },
-  { id: 5, nom: 'Hassan Idrissi',    heuresAchetees: 160, heuresFacturees: 148, retoursSAV: 2, penaliteSAV: 4 },
-  { id: 6, nom: 'Rachid Bouhali',    heuresAchetees: 160, heuresFacturees: 195, retoursSAV: 0, penaliteSAV: 0 },
-  { id: 7, nom: 'Omar Tazi',         heuresAchetees: 160, heuresFacturees: 160, retoursSAV: 0, penaliteSAV: 0 },
+  { id: 3, nom: 'Karim Amrani',      heuresAchetees: 160, heuresFacturees: 168, retoursSAV: 1, penaliteSAV: 2 },
+  { id: 4, nom: 'Hamza Bennani',     heuresAchetees: 160, heuresFacturees: 152, retoursSAV: 2, penaliteSAV: 3 },
+  { id: 5, nom: 'Sofiane Touati',    heuresAchetees: 160, heuresFacturees: 178, retoursSAV: 0, penaliteSAV: 0 },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,7 +244,7 @@ export default function PerformancesRentabiliteView() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Total H. Achetées</p>
               <p className="text-2xl font-black text-blue-700 leading-none">{totalAchetees}h</p>
-              <p className="text-xs text-slate-400 mt-1">{donneesActuelles.length} techniciens</p>
+              <p className="text-xs text-slate-400 mt-1">({donneesActuelles.length} techniciens)</p>
             </div>
           </div>
 
@@ -308,9 +304,9 @@ export default function PerformancesRentabiliteView() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
             <div>
-              <h2 className="text-sm font-bold text-slate-700">Heures Achetées vs Facturées per Technicien</h2>
+              <h2 className="text-sm font-bold text-slate-700">Heures Achetées vs Facturées par Technicien</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Vue {vueActuelle} — 7 techniciens
+                Vue {vueActuelle} — {donneesActuelles.length} techniciens
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs text-slate-400">
@@ -319,8 +315,8 @@ export default function PerformancesRentabiliteView() {
             </div>
           </div>
 
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} barCategoryGap="25%" barGap={4}>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={chartData} barCategoryGap="35%" barGap={6}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="nom" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => `${v}h`} />
@@ -344,7 +340,7 @@ export default function PerformancesRentabiliteView() {
               </p>
             </div>
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-600">
-              7 Techniciens
+              {donneesActuelles.length} Techniciens
             </span>
           </div>
 

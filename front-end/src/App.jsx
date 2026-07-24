@@ -7,8 +7,10 @@ import DirectionLayout from './layouts/DirectionLayout'
 // ─── Role → Layout mapping ─────────────────────────────────────────────────────
 const LAYOUT_MAP = {
   receptionniste: <ReceptionLayout />,
+  reception:      <ReceptionLayout />,
   technicien:     <TechnicianLayout />,
   chef_atelier:   <DirectionLayout />,
+  direction:      <DirectionLayout />,
 }
 
 // ─── Auth-aware router ─────────────────────────────────────────────────────────
