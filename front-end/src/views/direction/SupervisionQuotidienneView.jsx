@@ -1,138 +1,6 @@
-import React, { useState } from 'react'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA — Équipe Jour & Interventions
-// ─────────────────────────────────────────────────────────────────────────────
-const MOCK_EQUIPE_JOUR = [
-  {
-    id: 1,
-    nom: 'Yassir Zimi',
-    vehiculesTraites: 3,
-    statutGlobal: 'Actif',
-    interventions: [
-      {
-        id: 101,
-        vehicule: 'Renault Express - MQ-096-HI',
-        type: 'Vidange',
-        statut: 'En cours',
-        tempsBareme: 1.5,
-        tempsPasse: 1.2,
-      },
-      {
-        id: 102,
-        vehicule: 'Dacia Sandero - AB-123-CD',
-        type: 'Plaquettes',
-        statut: 'En attente',
-        tempsBareme: 1.0,
-        tempsPasse: 0,
-      },
-      {
-        id: 103,
-        vehicule: 'Peugeot 208 - EF-456-GH',
-        type: 'Remplacement Filtres',
-        statut: 'Terminé',
-        tempsBareme: 0.8,
-        tempsPasse: 0.7,
-      },
-    ],
-  },
-  {
-    id: 2,
-    nom: 'Meraouni Mustapha',
-    vehiculesTraites: 2,
-    statutGlobal: 'Terminé',
-    interventions: [
-      {
-        id: 104,
-        vehicule: 'Renault Clio 5 - WX-888-YZ',
-        type: 'Diagnostic',
-        statut: 'Terminé',
-        tempsBareme: 0.5,
-        tempsPasse: 0.8,
-      },
-      {
-        id: 105,
-        vehicule: 'Citroën C3 - IJ-789-KL',
-        type: 'Kit Distribution',
-        statut: 'Terminé',
-        tempsBareme: 3.0,
-        tempsPasse: 2.8,
-      },
-    ],
-  },
-  {
-    id: 3,
-    nom: 'Karim Amrani',
-    vehiculesTraites: 3,
-    statutGlobal: 'Actif',
-    interventions: [
-      {
-        id: 106,
-        vehicule: 'Volkswagen Golf 7 - MN-654-OP',
-        type: 'Parallélisme & Géométrie',
-        statut: 'En cours',
-        tempsBareme: 1.2,
-        tempsPasse: 1.5,
-      },
-      {
-        id: 107,
-        vehicule: 'Ford Transit - QR-321-ST',
-        type: 'Freins arrière',
-        statut: 'En attente',
-        tempsBareme: 2.0,
-        tempsPasse: 0,
-      },
-      {
-        id: 108,
-        vehicule: 'Toyota Yaris - UV-987-WX',
-        type: 'Recharge Climatisation',
-        statut: 'En attente',
-        tempsBareme: 1.0,
-        tempsPasse: 0,
-      },
-    ],
-  },
-  {
-    id: 4,
-    nom: 'Hamza Bennani',
-    vehiculesTraites: 1,
-    statutGlobal: 'Bloqué',
-    interventions: [
-      {
-        id: 109,
-        vehicule: 'Peugeot 3008 - YZ-456-AA',
-        type: 'Embrayage',
-        statut: 'Bloqué',
-        tempsBareme: 4.0,
-        tempsPasse: 3.5,
-      },
-    ],
-  },
-  {
-    id: 5,
-    nom: 'Sofiane Touati',
-    vehiculesTraites: 2,
-    statutGlobal: 'Actif',
-    interventions: [
-      {
-        id: 110,
-        vehicule: 'Nissan Qashqai - BB-123-CC',
-        type: 'Amortisseurs Avant',
-        statut: 'En cours',
-        tempsBareme: 2.5,
-        tempsPasse: 1.8,
-      },
-      {
-        id: 111,
-        vehicule: 'Fiat Tipo - DD-456-EE',
-        type: 'Vidange & Bougies',
-        statut: 'Terminé',
-        tempsBareme: 1.2,
-        tempsPasse: 1.0,
-      },
-    ],
-  },
-]
+import React, { useState, useEffect } from 'react'
+import api from '../../api/axios'
+import echo from '../../echo'
 
 // Helper format date standard YYYY-MM-DD
 function getTodayISO() {
@@ -146,16 +14,135 @@ function getTodayISO() {
 export default function SupervisionQuotidienneView() {
   // 1. Gestion de l'état
   const [dateFiltre, setDateFiltre] = useState(getTodayISO())
-  const [technicienActif, setTechnicienActif] = useState(null)
-  const [equipeJour] = useState(MOCK_EQUIPE_JOUR)
+  const [interventionsList, setInterventionsList] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [technicienActifId, setTechnicienActifId] = useState(null)
 
-  // 1. Fonction de formatage des temps décimaux en heures/minutes (UX)
+  // 2. Appel API vers /api/direction/supervision avec transmission du filtre date ({ params: { date: dateFiltre } })
+  const fetchSupervisionData = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      setError(null)
+      const response = await api.get('/direction/supervision', {
+        params: { date: dateFiltre },
+      })
+      const data = response.data?.interventions || []
+      setInterventionsList(data)
+    } catch (err) {
+      console.error('Erreur lors du chargement de la supervision:', err)
+      if (!silent) {
+        setError(err.response?.data?.message || 'Impossible de charger la supervision.')
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
+  // Chargement initial des données et au changement de la date sélectionnée (dateFiltre)
+  useEffect(() => {
+    fetchSupervisionData(false)
+  }, [dateFiltre])
+
+  // 3. Écouteur temps réel dédié avec Laravel Echo (Reverb) sur le canal 'atelier'
+  useEffect(() => {
+    const echoInstance = echo || window.Echo
+
+    if (echoInstance) {
+      const channel = echoInstance.channel('atelier')
+
+      const handleWebSocketEvent = (eventData) => {
+        console.log('⚡ Événement temps réel Reverb capté sur la supervision quotidienne:', eventData)
+        // Rechargement silencieux des données fraîches pour la date actuellement sélectionnée
+        fetchSupervisionData(true)
+      }
+
+      channel.listen('InterventionStatusChanged', handleWebSocketEvent)
+      channel.listen('.InterventionStatusChanged', handleWebSocketEvent)
+      channel.listen('.App\\Events\\InterventionStatusChanged', handleWebSocketEvent)
+
+      // Nettoyage impératif de l'écouteur au démontage
+      return () => {
+        channel.stopListening('InterventionStatusChanged')
+        channel.stopListening('.InterventionStatusChanged')
+        channel.stopListening('.App\\Events\\InterventionStatusChanged')
+        echoInstance.leaveChannel('atelier')
+      }
+    }
+  }, [dateFiltre])
+
+  // 4. Transformation dynamique du payload API en groupes par technicien
+  const equipeMap = {}
+
+  interventionsList.forEach((item) => {
+    const techId = item.technicien?.id || 0
+    const techNom = item.technicien?.nom_complet || 'Technicien Non Assigné'
+
+    if (!equipeMap[techId]) {
+      equipeMap[techId] = {
+        id: techId,
+        nom: techNom,
+        vehiculesTraites: 0,
+        statutGlobal: 'Actif',
+        interventions: [],
+      }
+    }
+
+    // Conversion en heures décimales pour la fonction formaterTemps
+    const tempsBaremeH = (item.bareme || 60) / 60
+    const tempsPasseH  = (item.temps_passe || 0) / 60
+
+    equipeMap[techId].interventions.push({
+      id: item.id,
+      vehicule: item.vehicule ? `${item.vehicule.nom_complet} (${item.vehicule.matricule})` : 'Véhicule N/A',
+      clientNom: item.client?.nom || 'Client Particulier',
+      clientTel: item.client?.telephone || 'Non renseigné',
+      type: item.type_intervention,
+      statut: item.statut,
+      motifBlocage: item.motif_blocage,
+      tempsBareme: tempsBaremeH,
+      tempsPasse: tempsPasseH,
+      heureArrivee: item.heure_arrivee,
+      pontNom: item.pont?.nom || 'Non affecté',
+    })
+
+    equipeMap[techId].vehiculesTraites = equipeMap[techId].interventions.length
+  })
+
+  // Déduction dynamique du statut global de chaque technicien
+  const equipeJour = Object.values(equipeMap).map((tech) => {
+    const hasBloque = tech.interventions.some((i) => i.statut === 'Bloqué')
+    const hasEnCours = tech.interventions.some((i) => i.statut === 'En cours' || i.statut === 'En attente')
+
+    let statutGlobal = 'Terminé'
+    if (hasBloque) statutGlobal = 'Bloqué'
+    else if (hasEnCours) statutGlobal = 'Actif'
+
+    // Calcul du rendement global du technicien
+    const totalBareme = tech.interventions.reduce((sum, i) => sum + (i.tempsBareme || 0), 0)
+    const totalPasse  = tech.interventions.reduce((sum, i) => sum + (i.tempsPasse || 0), 0)
+    const rendement   = totalBareme > 0 ? Math.min(Math.round((totalPasse / totalBareme) * 100), 100) : 0
+    const isDepassement = totalPasse > totalBareme && totalBareme > 0
+
+    return {
+      ...tech,
+      statutGlobal,
+      totalBareme,
+      totalPasse,
+      rendement,
+      isDepassement,
+    }
+  })
+
+  const technicienActif = equipeJour.find((t) => t.id === technicienActifId) || null
+
+  // Formatage des temps décimaux en heures/minutes (UX)
   const formaterTemps = (heuresDecimales) => {
-    if (!heuresDecimales || heuresDecimales === 0) return '0m'
+    if (!heuresDecimales || heuresDecimales <= 0) return '0m'
     const h = Math.floor(heuresDecimales)
     const m = Math.round((heuresDecimales - h) * 60)
 
-    if (h > 0 && m > 0) return `${h}h${m.toString().padStart(2, '0')}m`
+    if (h > 0 && m > 0) return `${h}h${m.toString().padStart(2, '0')}`
     if (h > 0 && m === 0) return `${h}h`
     return `${m}m`
   }
@@ -165,9 +152,20 @@ export default function SupervisionQuotidienneView() {
   const techniciensActifsCount = equipeJour.filter((t) => t.statutGlobal === 'Actif').length
   const techniciensBloquesCount = equipeJour.filter((t) => t.statutGlobal === 'Bloqué').length
 
+  if (loading && equipeJour.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <p className="text-xs font-bold text-slate-500 animate-pulse">Chargement de la supervision quotidienne...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50/50 p-6 space-y-6">
-      {/* ── 3. EN-TÊTE PRINCIPAL ── */}
+      {/* ── EN-TÊTE PRINCIPAL ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/70">
         <div>
           <div className="flex items-center gap-2">
@@ -253,105 +251,182 @@ export default function SupervisionQuotidienneView() {
         </div>
       </div>
 
-      {/* ── 3. GRILLE DES TECHNICIENS ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {equipeJour.map((technicien) => {
-          // Badge Statut Global
-          let badgeColor = ''
-          let badgeDotColor = ''
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECTION LISTE COMPACTE DES TECHNICIENS
+      ══════════════════════════════════════════════════════════════════════ */}
+      {equipeJour.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-400">
+          Aucun technicien ou intervention enregistré pour cette date ({dateFiltre}).
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/70 overflow-hidden">
+          {/* En-tête du tableau */}
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Performance Équipe
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">Rendement temps réel par technicien</p>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+              {equipeJour.length} technicien{equipeJour.length > 1 ? 's' : ''}
+            </span>
+          </div>
 
-          if (technicien.statutGlobal === 'Actif') {
-            badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            badgeDotColor = 'bg-emerald-500'
-          } else if (technicien.statutGlobal === 'Terminé') {
-            badgeColor = 'bg-slate-100 text-slate-700 border-slate-200'
-            badgeDotColor = 'bg-slate-400'
-          } else if (technicien.statutGlobal === 'Bloqué') {
-            badgeColor = 'bg-rose-50 text-rose-700 border-rose-200'
-            badgeDotColor = 'bg-rose-500'
-          }
+          {/* Ligne d'en-têtes de colonnes */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-2.5 bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="col-span-3">Technicien</div>
+            <div className="col-span-1 text-center">Statut</div>
+            <div className="col-span-1 text-center">Tâches</div>
+            <div className="col-span-5">Rendement Journée</div>
+            <div className="col-span-2 text-right">Action</div>
+          </div>
 
-          // Détection d'alerte surdépassement pour l'affichage visuel sur la carte
-          const aAlerteDepassement = technicien.interventions.some(
-            (i) => i.tempsPasse > i.tempsBareme
-          )
+          {/* Lignes de techniciens */}
+          <ul className="divide-y divide-slate-100">
+            {equipeJour.map((technicien) => {
+              // Badge Statut
+              let badgeCls = ''
+              let badgeDotCls = ''
+              if (technicien.statutGlobal === 'Actif') {
+                badgeCls = 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                badgeDotCls = 'bg-emerald-500'
+              } else if (technicien.statutGlobal === 'Terminé') {
+                badgeCls = 'bg-slate-50 text-slate-600 border-slate-200'
+                badgeDotCls = 'bg-slate-400'
+              } else if (technicien.statutGlobal === 'Bloqué') {
+                badgeCls = 'bg-rose-50 text-rose-700 border-rose-200'
+                badgeDotCls = 'bg-rose-500'
+              }
 
-          return (
-            <div
-              key={technicien.id}
-              onClick={() => setTechnicienActif(technicien)}
-              className="bg-white rounded-xl shadow-sm p-5 cursor-pointer hover:shadow-md hover:border-slate-300 border border-slate-200 transition-all duration-200 relative group flex flex-col justify-between"
-            >
-              {/* Entête Carte */}
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-900 text-yellow-400 font-bold flex items-center justify-center text-sm shadow-xs group-hover:scale-105 transition-transform">
-                      {technicien.nom
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
+              // Barre de progression
+              let barColor = 'bg-emerald-500'
+              let barTrack = 'bg-emerald-100'
+              if (technicien.isDepassement) {
+                barColor = 'bg-rose-500'
+                barTrack = 'bg-rose-100'
+              } else if (technicien.statutGlobal === 'Actif') {
+                barColor = 'bg-blue-500'
+                barTrack = 'bg-blue-100'
+              }
+
+              // Calcul du pourcentage réel plafonné à 100% pour la barre visuelle
+              const pourcentageBrut = technicien.totalBareme > 0 
+                ? Math.round((technicien.totalPasse / technicien.totalBareme) * 100) 
+                : 0
+              const largeurBarre = Math.min(pourcentageBrut, 100)
+
+              return (
+                <li
+                  key={technicien.id}
+                  className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center px-6 py-4 hover:bg-slate-50/60 transition-colors group"
+                >
+                  {/* COL 1 — Avatar + Nom */}
+                  <div className="md:col-span-3 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-slate-800 text-yellow-400 font-bold flex items-center justify-center text-xs shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                      {technicien.nom.split(' ').map((n) => n[0]).join('')}
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-base leading-snug group-hover:text-yellow-600 transition-colors">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate leading-tight">
                         {technicien.nom}
-                      </h3>
-                      <p className="text-xs text-slate-400">Technicien Atelier</p>
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">Technicien Atelier</p>
                     </div>
                   </div>
-                </div>
 
-                {/* Badge Statut Global */}
-                <div className="flex items-center justify-between mt-2 mb-4">
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${badgeDotColor} ${technicien.statutGlobal === 'Actif' ? 'animate-pulse' : ''}`} />
-                    {technicien.statutGlobal}
-                  </span>
-
-                  {aAlerteDepassement && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200" title="Temps dépassé sur au moins 1 intervention">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      Dépassement
+                  {/* COL 2 — Badge Statut */}
+                  <div className="md:col-span-1 flex md:justify-center">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border whitespace-nowrap ${badgeCls}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${badgeDotCls} ${technicien.statutGlobal === 'Actif' ? 'animate-pulse' : ''}`} />
+                      {technicien.statutGlobal}
                     </span>
-                  )}
-                </div>
+                  </div>
 
-                {/* Chiffre central */}
-                <div className="bg-slate-50 rounded-xl p-4 text-center border border-slate-100 my-2 group-hover:bg-slate-100/70 transition-colors">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                    Véhicules du jour
-                  </p>
-                  <p className="text-3xl font-black text-slate-900 mt-1">
-                    {technicien.vehiculesTraites}
-                  </p>
-                </div>
-              </div>
+                  {/* COL 3 — Compteur Tâches */}
+                  <div className="md:col-span-1 flex md:justify-center">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-lg font-black text-slate-800 leading-none">{technicien.vehiculesTraites}</span>
+                      <span className="text-[10px] font-medium text-slate-400 leading-none">véh.</span>
+                    </div>
+                  </div>
 
-              {/* Pied de Carte */}
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
-                <span>{technicien.interventions.length} intervention(s)</span>
-                <span className="text-yellow-600 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                  Détails
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+                  {/* COL 4 — Barre de Progression Rendement (Plafonnée à 100% max + Retard en h/m) */}
+                  <div className="md:col-span-5 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-slate-500">
+                        {formaterTemps(technicien.totalPasse)}
+                        <span className="text-slate-300 mx-1">/</span>
+                        {formaterTemps(technicien.totalBareme)}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {technicien.isDepassement ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs">
+                            <span>Retard :</span>
+                            <span className="font-black">+ {formaterTemps(technicien.totalPasse - technicien.totalBareme)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold tabular-nums text-slate-600">
+                            {largeurBarre}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Container de la barre visuelle plafonnée à 100% */}
+                    <div className={`w-full h-2 rounded-full overflow-hidden ${barTrack}`}>
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`}
+                        style={{ width: `${largeurBarre}%` }}
+                      />
+                    </div>
+                  </div>
 
-      {/* ── 4. PANNEAU LATÉRAL (SLIDE-OVER / DRAWER) ── */}
+                  {/* COL 5 — Bouton Détails */}
+                  <div className="md:col-span-2 flex md:justify-end">
+                    <button
+                      onClick={() => setTechnicienActifId(technicien.id)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 hover:bg-slate-800 hover:text-yellow-400 hover:border-slate-800 active:scale-95 transition-all duration-200 cursor-pointer group/btn"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Détails
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-0 -ml-1 group-hover/btn:opacity-100 group-hover/btn:ml-0 transition-all duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Pied du tableau */}
+          <div className="px-6 py-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-[11px] text-slate-400 font-medium">
+              {equipeJour.length} technicien{equipeJour.length > 1 ? 's' : ''} · {totalVehicules} véhicule{totalVehicules > 1 ? 's' : ''} traité{totalVehicules > 1 ? 's' : ''}
+            </p>
+            {techniciensBloquesCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {techniciensBloquesCount} blocage{techniciensBloquesCount > 1 ? 's' : ''} actif{techniciensBloquesCount > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── PANNEAU LATÉRAL (SLIDE-OVER / DRAWER / MODALE DÉTAILS) ── */}
       {technicienActif && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           {/* Overlay arrière-plan sombre avec effet flouté */}
           <div
-            onClick={() => setTechnicienActif(null)}
+            onClick={() => setTechnicienActifId(null)}
             className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity duration-300 animate-fade-in"
           />
 
@@ -379,7 +454,7 @@ export default function SupervisionQuotidienneView() {
 
               {/* Bouton Fermer (X) */}
               <button
-                onClick={() => setTechnicienActif(null)}
+                onClick={() => setTechnicienActifId(null)}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer"
                 title="Fermer (Esc)"
               >
@@ -417,7 +492,7 @@ export default function SupervisionQuotidienneView() {
                     {technicienActif.interventions.map((intervention) => {
                       const isDepasse = intervention.tempsPasse > intervention.tempsBareme
                       const pourcent = Math.min(
-                        Math.round((intervention.tempsPasse / intervention.tempsBareme) * 100),
+                        Math.round((intervention.tempsPasse / (intervention.tempsBareme || 1)) * 100),
                         100
                       )
 
@@ -450,8 +525,8 @@ export default function SupervisionQuotidienneView() {
                         )
                       } else if (intervention.statut === 'Bloqué') {
                         statusBadge = (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
                             Bloqué
@@ -459,7 +534,6 @@ export default function SupervisionQuotidienneView() {
                         )
                       }
 
-                      // Couleur de la Barre de Progression (Point clé du prompt)
                       let barColorClass = 'bg-emerald-500'
                       if (isDepasse) {
                         barColorClass = 'bg-rose-500'
@@ -479,13 +553,28 @@ export default function SupervisionQuotidienneView() {
                                 {intervention.vehicule}
                               </p>
                               <p className="text-xs font-medium text-slate-500 mt-0.5">
+                                Client : <span className="text-slate-700 font-semibold">{intervention.clientNom} ({intervention.clientTel})</span>
+                              </p>
+                              <p className="text-xs font-medium text-slate-500 mt-0.5">
                                 Type : <span className="text-slate-700 font-semibold">{intervention.type}</span>
                               </p>
                             </div>
                             <div>{statusBadge}</div>
                           </div>
 
-                          {/* La Barre de Progression (Le point clé) */}
+                          {/* ⚠️ BANNIÈRE D'ALERTE ROUGE CONDITIONNELLE MOTIF DE BLOCAGE */}
+                          {intervention.statut === 'Bloqué' && (
+                            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3.5 rounded-r-xl shadow-xs font-semibold my-2 flex items-start gap-2.5">
+                              <span className="text-base leading-none shrink-0 mt-0.5">⚠️</span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold uppercase tracking-wider text-red-800">
+                                  MOTIF DE BLOCAGE : {intervention.motifBlocage || intervention.motif_blocage || 'Problème technique / En attente de pièces'}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* La Barre de Progression */}
                           <div className="space-y-1.5 pt-1">
                             <div className="flex items-center justify-between text-xs">
                               <span className="font-semibold text-slate-700">
@@ -493,9 +582,9 @@ export default function SupervisionQuotidienneView() {
                               </span>
                               {isDepasse ? (
                                 <span className="font-bold text-rose-600 flex items-center gap-1">
-                                  <span>+{formaterTemps(intervention.tempsPasse - intervention.tempsBareme)}</span>
+                                  <span>+ {formaterTemps(intervention.tempsPasse - intervention.tempsBareme)}</span>
                                   <span className="text-[10px] uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-black">
-                                    Alerte Perte Rentabilité
+                                    Retard
                                   </span>
                                 </span>
                               ) : (
@@ -508,7 +597,7 @@ export default function SupervisionQuotidienneView() {
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${barColorClass}`}
                                 style={{
-                                  width: `${isDepasse ? 100 : pourcent}%`,
+                                  width: `${Math.min(pourcent, 100)}%`,
                                 }}
                               />
                             </div>
@@ -523,7 +612,7 @@ export default function SupervisionQuotidienneView() {
 
             {/* Pied du Panneau Latéral */}
             <div className="bg-white border-t border-slate-200 p-4 text-center text-xs text-slate-400">
-              Tour de Contrôle Chef d'Atelier • Mise à jour temps réel
+              Tour de Contrôle Chef d'Atelier • Temps réel API
             </div>
           </aside>
         </div>

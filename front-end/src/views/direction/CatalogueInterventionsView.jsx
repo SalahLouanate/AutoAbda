@@ -1,14 +1,5 @@
-import { useState, useMemo } from 'react'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA — Catalogue des interventions
-// ─────────────────────────────────────────────────────────────────────────────
-const INITIAL_INTERVENTIONS = [
-  { id: 1, nom: 'Vidange et Filtres',                         temps: 1.0 },
-  { id: 2, nom: 'Diagnostic complet',                         temps: 0.5 },
-  { id: 3, nom: 'Remplacement lève-vitre (système standard)', temps: 1.5 },
-  { id: 4, nom: 'Changement Plaquettes de frein',             temps: 1.0 },
-]
+import { useState, useMemo, useEffect } from 'react'
+import api from '../../api/axios'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ICÔNES SVG inline
@@ -78,6 +69,7 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
   const [nom,   setNom]   = useState(editTarget?.nom   ?? '')
   const [temps, setTemps] = useState(editTarget?.temps ?? '')
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   // Reset à chaque ouverture
   useMemo(() => {
@@ -85,6 +77,7 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
       setNom(editTarget?.nom   ?? '')
       setTemps(editTarget?.temps ?? '')
       setErrors({})
+      setSaving(false)
     }
   }, [isOpen, editTarget])
 
@@ -98,10 +91,12 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
     return Object.keys(e).length === 0
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (!validate()) return
-    onSave({ nom: nom.trim(), temps: parseFloat(Number(temps).toFixed(2)) })
+    setSaving(true)
+    await onSave({ nom: nom.trim(), temps: parseFloat(Number(temps).toFixed(2)) })
+    setSaving(false)
   }
 
   return (
@@ -189,15 +184,17 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 active:scale-95 transition-all"
+              disabled={saving}
+              className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 px-4 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-900 text-sm font-bold active:scale-95 shadow-md shadow-yellow-400/25 transition-all"
+              disabled={saving}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-slate-900 text-sm font-bold active:scale-95 shadow-md shadow-yellow-400/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isEdit ? 'Enregistrer' : 'Sauvegarder'}
+              {saving ? 'Enregistrement...' : (isEdit ? 'Enregistrer' : 'Sauvegarder')}
             </button>
           </div>
         </form>
@@ -217,7 +214,16 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
 // MODALE DE CONFIRMATION — Suppression
 // ─────────────────────────────────────────────────────────────────────────────
 function DeleteModal({ target, onClose, onConfirm }) {
+  const [deleting, setDeleting] = useState(false)
+
   if (!target) return null
+
+  const handleConfirm = async () => {
+    setDeleting(true)
+    await onConfirm()
+    setDeleting(false)
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
@@ -238,15 +244,17 @@ function DeleteModal({ target, onClose, onConfirm }) {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition"
+            disabled={deleting}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50"
           >
             Annuler
           </button>
           <button
-            onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition active:scale-95"
+            onClick={handleConfirm}
+            disabled={deleting}
+            className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition active:scale-95 disabled:opacity-50"
           >
-            Supprimer
+            {deleting ? 'Suppression...' : 'Supprimer'}
           </button>
         </div>
       </div>
@@ -264,11 +272,42 @@ function DeleteModal({ target, onClose, onConfirm }) {
 // COMPOSANT PRINCIPAL
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CatalogueInterventionsView() {
-  const [interventions, setInterventions] = useState(INITIAL_INTERVENTIONS)
+  const [interventions, setInterventions] = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState(null)
   const [searchQuery,   setSearchQuery]   = useState('')
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [editTarget,    setEditTarget]    = useState(null)   // null = création, objet = édition
   const [deleteTarget,  setDeleteTarget]  = useState(null)   // objet à supprimer
+
+  // ── Chargement initial via l'API (GET /api/direction/catalogue) ───────────
+  const fetchCatalogue = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await api.get('/direction/catalogue')
+      const rawList = response.data?.prestations || []
+      
+      const mapped = rawList.map(item => ({
+        id: item.id,
+        nom: item.nom,
+        temps: item.temps_bareme_heures || Math.round((item.temps_bareme / 60) * 100) / 100,
+        categorie: item.categorie,
+        tarif: item.tarif,
+        description: item.description,
+      }))
+      setInterventions(mapped)
+    } catch (err) {
+      console.error('Erreur lors du chargement du catalogue:', err)
+      setError(err.response?.data?.message || 'Impossible de charger le catalogue.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCatalogue()
+  }, [])
 
   // ── Filtrage ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -277,28 +316,49 @@ export default function CatalogueInterventionsView() {
     return interventions.filter(i => i.nom.toLowerCase().includes(q))
   }, [interventions, searchQuery])
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers API (POST, PUT, DELETE) ──────────────────────────────────────
   const openCreate = () => { setEditTarget(null); setIsModalOpen(true) }
   const openEdit   = (item) => { setEditTarget(item); setIsModalOpen(true) }
   const closeModal = () => setIsModalOpen(false)
 
-  const handleSave = ({ nom, temps }) => {
-    if (editTarget) {
-      // Mise à jour
-      setInterventions(prev =>
-        prev.map(i => i.id === editTarget.id ? { ...i, nom, temps } : i)
-      )
-    } else {
-      // Création
-      const newId = Math.max(0, ...interventions.map(i => i.id)) + 1
-      setInterventions(prev => [...prev, { id: newId, nom, temps }])
+  const handleSave = async ({ nom, temps }) => {
+    const tempsBaremeMinutes = Math.max(1, Math.round(temps * 60))
+    try {
+      if (editTarget) {
+        // PUT /api/direction/catalogue/{id}
+        await api.put(`/direction/catalogue/${editTarget.id}`, {
+          nom,
+          temps_bareme: tempsBaremeMinutes,
+        })
+      } else {
+        // POST /api/direction/catalogue
+        await api.post('/direction/catalogue', {
+          nom,
+          categorie: 'Mécanique',
+          temps_bareme: tempsBaremeMinutes,
+          tarif: 350,
+          description: 'Intervention catalogue',
+        })
+      }
+      await fetchCatalogue()
+      setIsModalOpen(false)
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde:', err)
+      alert(err.response?.data?.message || 'Erreur lors de la sauvegarde de l\'intervention.')
     }
-    setIsModalOpen(false)
   }
 
-  const handleDelete = () => {
-    setInterventions(prev => prev.filter(i => i.id !== deleteTarget.id))
-    setDeleteTarget(null)
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      // DELETE /api/direction/catalogue/{id}
+      await api.delete(`/direction/catalogue/${deleteTarget.id}`)
+      await fetchCatalogue()
+      setDeleteTarget(null)
+    } catch (err) {
+      console.error('Erreur lors de la suppression:', err)
+      alert(err.response?.data?.message || 'Erreur lors de la suppression de l\'intervention.')
+    }
   }
 
   // ── Formatage du temps ────────────────────────────────────────────────────
@@ -310,6 +370,17 @@ export default function CatalogueInterventionsView() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  if (loading && interventions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-yellow-200 border-t-yellow-500 rounded-full animate-spin" />
+          <p className="text-xs font-bold text-slate-500 animate-pulse">Chargement du catalogue des interventions...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
@@ -326,7 +397,7 @@ export default function CatalogueInterventionsView() {
           </div>
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-yellow-400 hover:bg-yellow-300 active:scale-95 text-slate-900 font-bold text-sm rounded-xl shadow-md shadow-yellow-400/30 transition-all duration-150 flex-shrink-0"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-yellow-400 hover:bg-yellow-300 active:scale-95 text-slate-900 font-bold text-sm rounded-xl shadow-md shadow-yellow-400/30 transition-all duration-150 flex-shrink-0 cursor-pointer"
           >
             <IcoPlus />
             Nouvelle intervention
@@ -378,7 +449,7 @@ export default function CatalogueInterventionsView() {
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {filtered.map((item, idx) => (
+              {filtered.map((item) => (
                 <li
                   key={item.id}
                   className="grid grid-cols-12 items-center px-6 py-4 hover:bg-slate-50/70 transition-colors group"
@@ -410,7 +481,7 @@ export default function CatalogueInterventionsView() {
                     <button
                       onClick={() => openEdit(item)}
                       title="Modifier"
-                      className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                     >
                       <IcoPen />
                     </button>
@@ -418,7 +489,7 @@ export default function CatalogueInterventionsView() {
                     <button
                       onClick={() => setDeleteTarget(item)}
                       title="Supprimer"
-                      className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                     >
                       <IcoTrash />
                     </button>
@@ -436,7 +507,7 @@ export default function CatalogueInterventionsView() {
               </p>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs text-slate-400">Données locales (mock)</span>
+                <span className="text-xs text-slate-400">Données synchronisées en direct (API)</span>
               </div>
             </div>
           )}

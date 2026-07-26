@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import api from '../../api/axios'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ICÔNES SVG inline
@@ -95,9 +96,12 @@ export default function MonProfilView() {
   const { user } = useAuth()
 
   // ── Section 1 : Informations Personnelles ────────────────────────────────
-  const [nom,   setNom]   = useState(user?.name  ?? 'Chef d\'Atelier')
-  const [email, setEmail] = useState(user?.email ?? 'chef@autoabda.ma')
+  const [nom,   setNom]   = useState(user?.name  ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
   const [profileErrors, setProfileErrors] = useState({})
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState('')
+  const [profileErrorMsg, setProfileErrorMsg]     = useState('')
+  const [savingProfile, setSavingProfile]         = useState(false)
 
   // ── Section 2 : Sécurité & Mot de passe ─────────────────────────────────
   const [mdpActuel,      setMdpActuel]      = useState('')
@@ -107,6 +111,9 @@ export default function MonProfilView() {
   const [showNouveau,    setShowNouveau]    = useState(false)
   const [showConfirm,    setShowConfirm]    = useState(false)
   const [passwordErrors, setPasswordErrors] = useState({})
+  const [passwordSuccessMsg, setPasswordSuccessMsg] = useState('')
+  const [passwordErrorMsg, setPasswordErrorMsg]     = useState('')
+  const [savingPassword, setSavingPassword]         = useState(false)
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   const [toast, setToast] = useState({ visible: false, message: '' })
@@ -115,6 +122,22 @@ export default function MonProfilView() {
     setToast({ visible: true, message })
     setTimeout(() => setToast({ visible: false, message: '' }), 3000)
   }
+
+  // ── Initialisation via GET /api/user ─────────────────────────────────────
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        const response = await api.get('/user')
+        if (response.data) {
+          setNom(response.data.name || '')
+          setEmail(response.data.email || '')
+        }
+      } catch (err) {
+        console.error('Erreur lors de la récupération des données utilisateur:', err)
+      }
+    }
+    fetchUserData()
+  }, [])
 
   // ── Initiales (avatar) ───────────────────────────────────────────────────
   const initiales = nom
@@ -125,7 +148,7 @@ export default function MonProfilView() {
     .join('')
 
   // ── Handler : Profil ──────────────────────────────────────────────────────
-  function handleProfileSubmit(e) {
+  async function handleProfileSubmit(e) {
     e.preventDefault()
     const errs = {}
     if (!nom.trim()) errs.nom = 'Le nom est obligatoire.'
@@ -133,12 +156,31 @@ export default function MonProfilView() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Format d\'email invalide.'
     setProfileErrors(errs)
     if (Object.keys(errs).length > 0) return
-    // Mock: persist
-    showToast('Profil mis à jour avec succès.')
+
+    try {
+      setSavingProfile(true)
+      setProfileSuccessMsg('')
+      setProfileErrorMsg('')
+
+      const response = await api.put('/user/profile', {
+        name: nom.trim(),
+        email: email.trim(),
+      })
+
+      const msg = response.data?.message || 'Profil mis à jour avec succès.'
+      setProfileSuccessMsg(msg)
+      showToast(msg)
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour du profil:', err)
+      const msg = err.response?.data?.message || 'Erreur lors de la mise à jour du profil.'
+      setProfileErrorMsg(msg)
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
   // ── Handler : Mot de passe ────────────────────────────────────────────────
-  function handlePasswordSubmit(e) {
+  async function handlePasswordSubmit(e) {
     e.preventDefault()
     const errs = {}
     if (!mdpActuel) errs.mdpActuel = 'Veuillez entrer votre mot de passe actuel.'
@@ -148,9 +190,36 @@ export default function MonProfilView() {
     else if (mdpNouveau && mdpConfirm !== mdpNouveau) errs.mdpConfirm = 'Les mots de passe ne correspondent pas.'
     setPasswordErrors(errs)
     if (Object.keys(errs).length > 0) return
-    // Mock: reset fields
-    setMdpActuel(''); setMdpNouveau(''); setMdpConfirm('')
-    showToast('Mot de passe changé avec succès.')
+
+    try {
+      setSavingPassword(true)
+      setPasswordSuccessMsg('')
+      setPasswordErrorMsg('')
+
+      const response = await api.put('/user/password', {
+        current_password: mdpActuel,
+        password: mdpNouveau,
+        password_confirmation: mdpConfirm,
+      })
+
+      // Vider les champs après un succès
+      setMdpActuel('')
+      setMdpNouveau('')
+      setMdpConfirm('')
+
+      const msg = response.data?.message || 'Mot de passe changé avec succès.'
+      setPasswordSuccessMsg(msg)
+      showToast(msg)
+    } catch (err) {
+      console.error('Erreur lors de la modification du mot de passe:', err)
+      const msg = err.response?.data?.message || 'Erreur lors du changement de mot de passe.'
+      setPasswordErrorMsg(msg)
+      if (err.response?.data?.errors?.current_password) {
+        setPasswordErrors(v => ({ ...v, mdpActuel: err.response.data.errors.current_password[0] }))
+      }
+    } finally {
+      setSavingPassword(false)
+    }
   }
 
   // ── Calcul force du mot de passe ──────────────────────────────────────────
@@ -240,15 +309,28 @@ export default function MonProfilView() {
                 />
               </div>
 
+              {/* Messages de retour profil */}
+              {profileSuccessMsg && (
+                <p className="text-xs font-semibold text-emerald-600 mb-4 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                  ✓ {profileSuccessMsg}
+                </p>
+              )}
+              {profileErrorMsg && (
+                <p className="text-xs font-semibold text-red-600 mb-4 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                  ⚠ {profileErrorMsg}
+                </p>
+              )}
+
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-600/25 transition-all"
+                  disabled={savingProfile}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-600/25 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
                   </svg>
-                  Mettre à jour le profil
+                  {savingProfile ? 'Enregistrement...' : 'Mettre à jour le profil'}
                 </button>
               </div>
             </form>
@@ -378,13 +460,26 @@ export default function MonProfilView() {
                   </ul>
                 </div>
 
+                {/* Messages de retour mot de passe */}
+                {passwordSuccessMsg && (
+                  <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                    ✓ {passwordSuccessMsg}
+                  </p>
+                )}
+                {passwordErrorMsg && (
+                  <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                    ⚠ {passwordErrorMsg}
+                  </p>
+                )}
+
                 <div className="flex justify-end pt-1">
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-md shadow-slate-900/15 transition-all"
+                    disabled={savingPassword}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-900 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-md shadow-slate-900/15 transition-all disabled:opacity-50 cursor-pointer"
                   >
                     <IcoLock />
-                    Changer le mot de passe
+                    {savingPassword ? 'Changement...' : 'Changer le mot de passe'}
                   </button>
                 </div>
               </div>

@@ -25,6 +25,9 @@ class User extends Authenticatable
         'password',
         'role',
         'pont_id',
+        'telephone',
+        'specialite',
+        'is_active',
     ];
 
     /**
@@ -47,6 +50,23 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Get all interventions for this user (technicien).
+     */
+    public function interventions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Intervention::class);
+    }
+
+    /**
+     * Get the pont assigned to this technicien.
+     */
+    public function pont(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Pont::class);
     }
 }

@@ -1,55 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import {
   PieChart, Pie, Cell, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from 'recharts'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DONNÉES STATIQUES — 5 ponts de l'atelier
-// ─────────────────────────────────────────────────────────────────────────────
-const PONTS_INITIAL = [
-  {
-    id: 1, label: 'Pont 1',
-    statut: 'occupe',
-    technicien: 'Yassir Zimi',
-    vehicule: '1234-A-50',
-    intervention: 'Vidange',
-    tempsBareme: 60,
-    tempsPasse: 45,
-  },
-  {
-    id: 2, label: 'Pont 2',
-    statut: 'occupe',
-    technicien: 'Meraouni Mustapha',
-    vehicule: 'IJ-789-KL',
-    intervention: 'Diagnostic',
-    tempsBareme: 30,
-    tempsPasse: 45,
-  },
-  {
-    id: 3, label: 'Pont 3',
-    statut: 'occupe',
-    technicien: 'Karim Amrani',
-    vehicule: 'AB-123-CD',
-    intervention: 'Plaquettes',
-    tempsBareme: 90,
-    tempsPasse: 10,
-  },
-  { id: 4, label: 'Pont 4', statut: 'libre',       technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
-  { id: 5, label: 'Pont 5', statut: 'maintenance', technicien: null, vehicule: null, intervention: null, tempsBareme: 0, tempsPasse: 0 },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-const isRetard = (p) => p.statut === 'occupe' && p.tempsPasse > p.tempsBareme
-const getPct   = (p) => p.tempsBareme > 0 ? Math.min(100, Math.round((p.tempsPasse / p.tempsBareme) * 100)) : 0
+import api from '../../api/axios'
+import echo from '../../echo'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ICÔNES SVG inline
 // ─────────────────────────────────────────────────────────────────────────────
-
-
 const IcoCar = ({ cls = 'h-4 w-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 17h8M3 11l2-5h14l2 5M3 11h18v6H3v-6zm3 6v1a1 1 0 002 0v-1m8 0v1a1 1 0 002 0v-1"/>
@@ -96,26 +55,25 @@ function DonutTooltip({ active, payload }) {
   )
 }
 
-function OccupationDonut({ ponts }) {
-  const occupes  = ponts.filter(p => p.statut === 'occupe').length
-  const libres   = ponts.filter(p => p.statut === 'libre').length
-  const maint    = ponts.filter(p => p.statut === 'maintenance').length
+function OccupationDonut({ kpis }) {
+  const occupes = kpis?.ponts_occupes ?? 0
+  const libres  = kpis?.ponts_libres ?? 0
+  const pct     = kpis?.pourcentage_occupation ?? 0
+  const total   = occupes + libres || 5
   const data = [
-    { name: 'Occupés',     value: occupes },
-    { name: 'Libres',      value: libres },
-    { name: 'Maintenance', value: maint },
+    { name: 'Occupés', value: occupes },
+    { name: 'Libres',  value: libres },
   ]
-  const pctOccupe = Math.round((occupes / ponts.length) * 100)
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-slate-700">Taux d'occupation</h2>
-          <p className="text-xs text-slate-400 mt-0.5">État des {ponts.length} ponts en ce moment</p>
+          <p className="text-xs text-slate-400 mt-0.5">État des {total} ponts en ce moment</p>
         </div>
         <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-          {pctOccupe}% utilisé
+          {pct}% utilisé
         </span>
       </div>
       <div className="flex items-center gap-6">
@@ -149,7 +107,7 @@ function OccupationDonut({ ponts }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BAR CHART — Charge de travail par technicien
+// BAR CHART — Charge de travail par technicien actif
 // ─────────────────────────────────────────────────────────────────────────────
 function BarTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
@@ -165,23 +123,21 @@ function BarTooltip({ active, payload, label }) {
   )
 }
 
-function ChargeBarChart({ ponts }) {
-  const data = ponts
-    .filter(p => p.statut === 'occupe')
-    .map(p => ({
-      nom: p.technicien.split(' ')[0],
-      'Barème': p.tempsBareme,
-      'Passé':  p.tempsPasse,
-    }))
+function ChargeBarChart({ chargeTravail }) {
+  const data = (chargeTravail || []).map(item => ({
+    nom: item.technicien ? item.technicien.split(' ')[0] : 'Tech',
+    'Barème': item.bareme || 60,
+    'Passé': item.temps_passe || 0,
+  }))
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
       <div className="mb-4">
         <h2 className="text-sm font-bold text-slate-700">Charge de travail</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Temps barémé vs. temps passé (min) — techniciens actifs</p>
+        <p className="text-xs text-slate-400 mt-0.5">Temps barémé vs. temps passé (min) — interventions en cours</p>
       </div>
       <ResponsiveContainer width="100%" height={160}>
-        <BarChart data={data} barCategoryGap="35%" barGap={3}>
+        <BarChart data={data.length > 0 ? data : [{ nom: 'Aucun', Barème: 0, Passé: 0 }]} barCategoryGap="35%" barGap={3}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
           <XAxis dataKey="nom" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={30} tickFormatter={v => `${v}'`} />
@@ -191,7 +147,7 @@ function ChargeBarChart({ ponts }) {
         </BarChart>
       </ResponsiveContainer>
       <div className="flex items-center gap-4 mt-3">
-        <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-200 inline-block"/>Barème</span>
+        <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-200 inline-block"/>Barème (réf 60')</span>
         <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-500 inline-block"/>Temps passé</span>
       </div>
     </div>
@@ -199,14 +155,26 @@ function ChargeBarChart({ ponts }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CARTE PONT
+// CARTE PONT DYNAMIQUE (Supervision)
 // ─────────────────────────────────────────────────────────────────────────────
 function PontCard({ pont }) {
-  const retard = isRetard(pont)
-  const pct    = getPct(pont)
+  const statutUpper = pont.statut ? pont.statut.toUpperCase() : 'LIBRE'
+  const isMaintenance = statutUpper === 'MAINTENANCE'
+  const isLibre = statutUpper === 'LIBRE'
+  const isRetard = statutUpper === 'EN_RETARD'
+  const isEnCours = statutUpper === 'EN_COURS'
+
+  const technicien = pont.technicien_assigne || 'Technicien non assigné'
+  const intervention = pont.intervention
+  const vehiculeLabel = intervention?.vehicule || 'Véhicule N/A'
+  const interventionType = intervention?.type_intervention || 'Intervention'
+
+  const tempsPasse = intervention?.temps_passe ?? 0
+  const tempsBareme = intervention?.bareme ?? 60
+  const pct = tempsBareme > 0 ? Math.min(100, Math.round((tempsPasse / tempsBareme) * 100)) : 0
 
   // ── MAINTENANCE ────────────────────────────────────────────────────────
-  if (pont.statut === 'maintenance') {
+  if (isMaintenance) {
     return (
       <div
         className="rounded-2xl border-2 border-slate-300 bg-slate-100 p-5 shadow-sm overflow-hidden relative"
@@ -218,7 +186,7 @@ function PontCard({ pont }) {
         <div className="flex flex-col items-center justify-center gap-3 py-4 text-slate-400">
           <IcoGear cls="h-10 w-10 text-slate-400" />
           <div className="text-center">
-            <p className="text-sm font-bold text-slate-600">{pont.label}</p>
+            <p className="text-sm font-bold text-slate-600">{pont.nom || `Pont ${pont.id}`}</p>
             <p className="text-xs text-slate-400 mt-0.5">En maintenance</p>
           </div>
         </div>
@@ -231,50 +199,52 @@ function PontCard({ pont }) {
   }
 
   // ── LIBRE ──────────────────────────────────────────────────────────────
-  if (pont.statut === 'libre') {
+  if (isLibre) {
     return (
       <div className="rounded-2xl border-2 border-emerald-300 bg-white p-5 shadow-sm flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-700">{pont.label}</p>
+          <p className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</p>
           <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase tracking-wider">Libre</span>
         </div>
         <div className="flex flex-col items-center justify-center gap-2 py-5">
           <IcoCheck cls="h-10 w-10 text-emerald-400" />
           <p className="text-sm font-semibold text-emerald-600">Prêt à l'emploi</p>
-          <p className="text-xs text-slate-400">Aucun véhicule assigné</p>
+          <p className="text-xs text-slate-400 text-center">
+            {technicien ? `Assigné à : ${technicien}` : 'Aucune intervention active'}
+          </p>
         </div>
       </div>
     )
   }
 
-  // ── OCCUPÉ (dans les temps ou en retard) ──────────────────────────────
-  const borderCls   = retard ? 'border-red-500'   : 'border-blue-400'
-  const badgeCls    = retard ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
-  const trackCls    = retard ? 'bg-red-100'        : 'bg-blue-100'
-  const barCls      = retard ? 'bg-red-500'        : 'bg-blue-500'
-  const avatarCls   = retard ? 'bg-red-500'        : 'bg-blue-500'
-  const pulseCls    = retard ? 'pont-retard'       : ''
+  // ── EN COURS / EN RETARD ───────────────────────────────────────────────
+  const borderCls   = isRetard ? 'border-red-500'   : 'border-blue-400'
+  const badgeCls    = isRetard ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
+  const trackCls    = isRetard ? 'bg-red-100'        : 'bg-blue-100'
+  const barCls      = isRetard ? 'bg-red-500'        : 'bg-blue-500'
+  const avatarCls   = isRetard ? 'bg-red-500'        : 'bg-blue-500'
+  const pulseCls    = isRetard ? 'pont-retard'       : ''
 
   return (
     <div className={`rounded-2xl border-2 ${borderCls} bg-white p-5 shadow-sm flex flex-col gap-3 ${pulseCls}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-slate-700">{pont.label}</p>
+        <p className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</p>
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${badgeCls}`}>
-          {retard ? 'En retard' : 'En cours'}
+          {isRetard ? 'En retard' : (intervention?.statut_intervention === 'Bloqué' ? 'Bloqué' : 'En cours')}
         </span>
       </div>
 
       {/* Technicien */}
       <div className="flex items-center gap-2">
         <div className={`w-8 h-8 rounded-full ${avatarCls} flex items-center justify-center flex-shrink-0 text-white font-black text-xs`}>
-          {pont.technicien.charAt(0)}
+          {technicien.charAt(0)}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-800 truncate">{pont.technicien}</p>
+          <p className="text-sm font-semibold text-slate-800 truncate">{technicien}</p>
           <div className="flex items-center gap-1 text-xs text-slate-400">
             <IcoCar cls="h-3.5 w-3.5" />
-            <span className="font-mono">{pont.vehicule}</span>
+            <span className="font-mono truncate">{vehiculeLabel}</span>
           </div>
         </div>
       </div>
@@ -282,7 +252,7 @@ function PontCard({ pont }) {
       {/* Intervention */}
       <div className="flex items-center gap-1.5 text-xs text-slate-500">
         <IcoWrench cls="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{pont.intervention}</span>
+        <span className="truncate">{interventionType}</span>
       </div>
 
       {/* Barre de progression */}
@@ -293,17 +263,17 @@ function PontCard({ pont }) {
         <div className="flex items-center justify-between mt-1.5">
           <div className="flex items-center gap-1">
             <IcoClock cls="h-3.5 w-3.5 text-slate-400" />
-            <span className={`text-xs font-bold ${retard ? 'text-red-600' : 'text-slate-600'}`}>
-              {pont.tempsPasse} min passées
+            <span className={`text-xs font-bold ${isRetard ? 'text-red-600' : 'text-slate-600'}`}>
+              {tempsPasse} min passées
             </span>
           </div>
-          <span className="text-xs text-slate-400">/ {pont.tempsBareme} min barémé</span>
+          <span className="text-xs text-slate-400">/ {tempsBareme} min réf</span>
         </div>
-        {retard && (
+        {isRetard && (
           <div className="flex items-center gap-1 mt-1.5 bg-red-50 rounded-lg px-2 py-1">
             <IcoAlert cls="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
             <span className="text-xs font-bold text-red-600">
-              +{pont.tempsPasse - pont.tempsBareme} min de dépassement
+              +{tempsPasse - tempsBareme} min de dépassement
             </span>
           </div>
         )}
@@ -316,19 +286,110 @@ function PontCard({ pont }) {
 // COMPOSANT PRINCIPAL — DashboardDirectionView
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardDirectionView() {
-  const [ponts] = useState(PONTS_INITIAL)
+  const [dashboardData, setDashboardData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const occupes  = useMemo(() => ponts.filter(p => p.statut === 'occupe').length,     [ponts])
-  const libres   = useMemo(() => ponts.filter(p => p.statut === 'libre').length,      [ponts])
-  const enRetard = useMemo(() => ponts.filter(p => isRetard(p)).length,               [ponts])
-  const maint    = useMemo(() => ponts.filter(p => p.statut === 'maintenance').length,[ponts])
+  // 1. Fonction centrale de récupération silencieuse / complète des données
+  const fetchDashboardData = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      setError(null)
+      const response = await api.get('/direction/dashboard')
+      // Remplace l'intégralité du state global (KPIs + Ponts + Charge de travail) sans mutation partielle
+      setDashboardData(response.data)
+    } catch (err) {
+      console.error('Erreur lors du chargement des statistiques direction:', err)
+      if (!silent) {
+        setError(err.response?.data?.message || 'Impossible de charger la Tour de Contrôle.')
+      }
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
+  // Chargement initial des données au montage du composant
+  useEffect(() => {
+    fetchDashboardData(false)
+  }, [])
+
+  // 2. Écouteur WebSocket Laravel Echo sur le canal public 'atelier'
+  useEffect(() => {
+    const echoInstance = echo || window.Echo
+
+    if (echoInstance) {
+      const channel = echoInstance.channel('atelier')
+
+      const handleWebSocketEvent = () => {
+        console.log('⚡ Événement WebSocket reçu : Rechargement complet de l\'API Direction...')
+        // Rechargement silencieux de l'intégralité du JSON (/api/direction/dashboard)
+        fetchDashboardData(true)
+      }
+
+      channel.listen('InterventionStatusChanged', handleWebSocketEvent)
+      channel.listen('.InterventionStatusChanged', handleWebSocketEvent)
+      channel.listen('.App\\Events\\InterventionStatusChanged', handleWebSocketEvent)
+
+      // Nettoyage impératif de l'écouteur au démontage
+      return () => {
+        channel.stopListening('InterventionStatusChanged')
+        channel.stopListening('.InterventionStatusChanged')
+        channel.stopListening('.App\\Events\\InterventionStatusChanged')
+        echoInstance.leaveChannel('atelier')
+      }
+    }
+  }, [])
+
+  const kpis = dashboardData?.kpis || {
+    ponts_occupes: 0,
+    pourcentage_occupation: 0,
+    ponts_libres: 0,
+    interventions_du_jour: 0,
+    terminees_aujourdhui: 0,
+  }
+  const pontsList = dashboardData?.ponts || []
+  const chargeTravail = dashboardData?.charge_travail || []
 
   const now   = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
+  // Chargement simple et élégant
+  if (loading && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+          <p className="text-sm font-bold text-slate-600 animate-pulse">
+            Chargement de la Tour de Contrôle...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Affichage d'erreur
+  if (error && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
+        <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-sm max-w-md text-center">
+          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+            <IcoAlert cls="h-6 w-6" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 mb-1">Erreur de chargement</h3>
+          <p className="text-xs text-slate-500 mb-4">{error}</p>
+          <button
+            onClick={() => fetchDashboardData(false)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-
       {/* Animation CSS inline pour la bordure rouge clignotante */}
       <style>{`
         @keyframes borderPulse {
@@ -339,7 +400,6 @@ export default function DashboardDirectionView() {
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-
         {/* ── EN-TÊTE ────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -359,10 +419,34 @@ export default function DashboardDirectionView() {
         {/* ── KPI STRIP ──────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Ponts occupés',   value: `${occupes} / ${ponts.length}`, sub: 'actuellement actifs',      color: 'blue',   icon: <IcoCar cls="h-5 w-5"   /> },
-            { label: 'Ponts libres',    value: libres,            sub: 'disponibles maintenant',   color: 'emerald',icon: <IcoCheck cls="h-5 w-5"  /> },
-            { label: 'En retard',       value: enRetard,          sub: enRetard > 0 ? 'dépassement détecté' : 'aucun dépassement', color: enRetard > 0 ? 'red' : 'slate', icon: <IcoAlert cls="h-5 w-5"  /> },
-            { label: 'Maintenance',     value: maint,             sub: 'hors service aujourd\'hui', color: 'slate',  icon: <IcoGear cls="h-5 w-5"   /> },
+            {
+              label: 'Ponts occupés',
+              value: `${kpis.ponts_occupes} / ${pontsList.length || 5}`,
+              sub: `${kpis.pourcentage_occupation}% d'occupation`,
+              color: 'blue',
+              icon: <IcoCar cls="h-5 w-5" />,
+            },
+            {
+              label: 'Ponts libres',
+              value: kpis.ponts_libres,
+              sub: 'disponibles maintenant',
+              color: 'emerald',
+              icon: <IcoCheck cls="h-5 w-5" />,
+            },
+            {
+              label: 'Interventions du jour',
+              value: kpis.interventions_du_jour,
+              sub: 'créées aujourd\'hui',
+              color: 'indigo',
+              icon: <IcoWrench cls="h-5 w-5" />,
+            },
+            {
+              label: 'Terminées aujourd\'hui',
+              value: kpis.terminees_aujourdhui,
+              sub: 'interventions clôturées',
+              color: 'emerald',
+              icon: <IcoCheck cls="h-5 w-5" />,
+            },
           ].map(k => (
             <div key={k.label} className={`bg-${k.color}-50 border border-${k.color}-200 rounded-2xl p-5 shadow-sm flex items-center gap-4`}>
               <div className={`flex-shrink-0 w-10 h-10 rounded-xl bg-${k.color}-100 text-${k.color}-500 flex items-center justify-center`}>
@@ -379,14 +463,14 @@ export default function DashboardDirectionView() {
 
         {/* ── GRAPHIQUES RECHARTS ─────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <OccupationDonut ponts={ponts} />
-          <ChargeBarChart  ponts={ponts} />
+          <OccupationDonut kpis={kpis} />
+          <ChargeBarChart chargeTravail={chargeTravail} />
         </div>
 
-        {/* ── GRILLE 7 PONTS ──────────────────────────────────── */}
+        {/* ── GRILLE DES PONTS (SUPERVISION) ───────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-slate-700">Supervision des {ponts.length} Ponts</h2>
+            <h2 className="text-base font-bold text-slate-700">Supervision des {pontsList.length || 5} Ponts</h2>
             <div className="hidden sm:flex items-center gap-4 text-xs text-slate-400">
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block"/>En cours</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"/>Libre</span>
@@ -395,7 +479,7 @@ export default function DashboardDirectionView() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {ponts.map(pont => (
+            {pontsList.map(pont => (
               <PontCard key={pont.id} pont={pont} />
             ))}
           </div>

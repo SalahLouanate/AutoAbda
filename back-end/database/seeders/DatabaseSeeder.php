@@ -16,6 +16,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         Schema::disableForeignKeyConstraints();
+        DB::table('prestations')->truncate();
+        DB::table('interventions')->truncate();
+        DB::table('vehicules')->truncate();
         DB::table('users')->truncate();
         DB::table('ponts')->truncate();
         Schema::enableForeignKeyConstraints();
@@ -63,5 +66,10 @@ class DatabaseSeeder extends Seeder
                 'pont_id'  => $tech['pont_id'],
             ]);
         }
+
+        $this->call([
+            InterventionSeeder::class,
+            PrestationSeeder::class,
+        ]);
     }
 }

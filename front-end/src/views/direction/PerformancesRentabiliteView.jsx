@@ -1,44 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA — 5 Techniciens (configuration réelle du garage)
-// ─────────────────────────────────────────────────────────────────────────────
-const DONNEES_JOUR = [
-  { id: 1, nom: 'Yassir Zimi',       heuresAchetees: 8, heuresFacturees: 9.5, retoursSAV: 0, penaliteSAV: 0   },
-  { id: 2, nom: 'Meraouni Mustapha', heuresAchetees: 8, heuresFacturees: 6.0, retoursSAV: 1, penaliteSAV: 2   },
-  { id: 3, nom: 'Karim Amrani',      heuresAchetees: 8, heuresFacturees: 8.5, retoursSAV: 0, penaliteSAV: 0   },
-  { id: 4, nom: 'Hamza Bennani',     heuresAchetees: 8, heuresFacturees: 7.0, retoursSAV: 1, penaliteSAV: 1.5 },
-  { id: 5, nom: 'Sofiane Touati',    heuresAchetees: 8, heuresFacturees: 9.0, retoursSAV: 0, penaliteSAV: 0   },
-]
-
-const DONNEES_MOIS = [
-  { id: 1, nom: 'Yassir Zimi',       heuresAchetees: 160, heuresFacturees: 185, retoursSAV: 1, penaliteSAV: 2 },
-  { id: 2, nom: 'Meraouni Mustapha', heuresAchetees: 160, heuresFacturees: 130, retoursSAV: 3, penaliteSAV: 6 },
-  { id: 3, nom: 'Karim Amrani',      heuresAchetees: 160, heuresFacturees: 168, retoursSAV: 1, penaliteSAV: 2 },
-  { id: 4, nom: 'Hamza Bennani',     heuresAchetees: 160, heuresFacturees: 152, retoursSAV: 2, penaliteSAV: 3 },
-  { id: 5, nom: 'Sofiane Touati',    heuresAchetees: 160, heuresFacturees: 178, retoursSAV: 0, penaliteSAV: 0 },
-]
+import api from '../../api/axios'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-function enrichir(tech, taux) {
-  const heuresSup = Number((tech.heuresFacturees - tech.heuresAchetees).toFixed(2))
-  const bilanNet  = Number((tech.heuresFacturees - tech.heuresAchetees - tech.penaliteSAV).toFixed(2))
-  const prime     = bilanNet > 0 ? Math.round(bilanNet * taux) : 0
-  return {
-    ...tech,
-    heuresSup,
-    bilanNet,
-    prime,
-    rentable: bilanNet >= 0,
-  }
-}
-
 function fmtH(v) {
   if (v === 0) return '0h00'
   const sign = v < 0 ? '-' : '+'
@@ -53,7 +22,7 @@ function fmtMAD(v) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ICÔNES
+// ICÔNES SVG
 // ─────────────────────────────────────────────────────────────────────────────
 function IcoClock({ cls = 'h-5 w-5' }) {
   return (
@@ -121,26 +90,80 @@ export default function PerformancesRentabiliteView() {
   const todayISO = new Date().toISOString().slice(0, 10)
   const monthISO = new Date().toISOString().slice(0, 7)
 
-  const [vueActuelle,      setVueActuelle]      = useState('Jour')
-  const [dateSelectionnee, setDateSelectionnee] = useState(todayISO)
-  const [tauxCommission,   setTauxCommission]   = useState(50)
+  // 1. États pour les filtres dynamiques (mode de vue, date sélectionnée, taux de commission à 35 MAD/h)
+  const [vueActuelle,      setVueActuelle]      = useState('Mois')     // 'Jour' ou 'Mois'
+  const [dateSelectionnee, setDateSelectionnee] = useState(monthISO)   // Date ISO (YYYY-MM-DD ou YYYY-MM)
+  const [tauxCommission,   setTauxCommission]   = useState(35)         // Taux de commission par défaut : 35 MAD/h
+  const [bilanData,        setBilanData]        = useState(null)
+  const [loading,          setLoading]          = useState(true)
+  const [error,            setError]            = useState(null)
 
-  // ── Données enrichies dynamiques ──────────────────────────────────────────
+  // 2. Appel API dynamique vers /api/direction/bilan avec transmission de { mode, date, rate }
+  const fetchBilanData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const modeParam = vueActuelle === 'Jour' ? 'today' : 'month'
+
+      const response = await api.get('/direction/bilan', {
+        params: {
+          mode: modeParam,
+          date: dateSelectionnee,
+          rate: tauxCommission,
+        },
+      })
+      setBilanData(response.data)
+    } catch (err) {
+      console.error('Erreur lors du chargement du bilan:', err)
+      setError(err.response?.data?.message || 'Impossible de charger le bilan.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 3. Inscription des 3 filtres dans le tableau de dépendances du useEffect
+  useEffect(() => {
+    fetchBilanData()
+  }, [vueActuelle, dateSelectionnee, tauxCommission])
+
+  // 4. Remplacement des fausses données par un .map() sur bilanData.performances_techniciens
   const donneesActuelles = useMemo(() => {
-    const rawData = vueActuelle === 'Jour' ? DONNEES_JOUR : DONNEES_MOIS
-    const validTaux = Number.isNaN(Number(tauxCommission)) ? 0 : Math.max(0, Number(tauxCommission))
-    return rawData.map((t) => enrichir(t, validTaux))
-  }, [vueActuelle, tauxCommission])
+    if (!bilanData?.performances_techniciens) return []
 
-  // ── Agrégats totaux ──────────────────────────────────────────────────────
-  const totalAchetees   = useMemo(() => donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0), [donneesActuelles])
-  const totalFacturees  = useMemo(() => donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0), [donneesActuelles])
-  const totalPrime      = useMemo(() => donneesActuelles.reduce((s, t) => s + t.prime, 0), [donneesActuelles])
-  const tauxEfficacite  = useMemo(() => (totalAchetees > 0 ? Math.round((totalFacturees / totalAchetees) * 100) : 0), [totalAchetees, totalFacturees])
-  const totalBilanNet   = useMemo(() => donneesActuelles.reduce((s, t) => s + t.bilanNet, 0), [donneesActuelles])
-  const totalMalusSAV   = useMemo(() => donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0), [donneesActuelles])
+    return bilanData.performances_techniciens.map((tech) => {
+      const heuresAchetees  = tech.temps_bareme_heures || 0
+      const heuresFacturees = tech.temps_passe_heures  || 0
+      const heuresSup       = tech.heures_gagnees       || 0
+      const penaliteSAV     = tech.heures_perdues       || 0
+      const bilanNet        = Number((heuresSup - penaliteSAV).toFixed(2))
+      const prime           = tech.prime_montant        || 0
 
-  // ── Formattage Recharts BarChart ──────────────────────────────────────────
+      return {
+        id: tech.id,
+        nom: tech.nom,
+        heuresAchetees,
+        heuresFacturees,
+        heuresSup,
+        retoursSAV: penaliteSAV > 0 ? 1 : 0,
+        penaliteSAV,
+        bilanNet,
+        prime,
+        primeFormatted: tech.prime_formatted,
+        rentable: bilanNet >= 0,
+      }
+    })
+  }, [bilanData])
+
+  // 5. Agrégats totaux dynamiques
+  const totalAchetees   = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
+  const totalFacturees  = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
+  const totalPrime      = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
+  const tauxEfficacite  = useMemo(() => bilanData?.kpis_globaux?.taux_efficacite_global ?? (totalAchetees > 0 ? Math.round((totalFacturees / totalAchetees) * 100) : 0), [bilanData, totalAchetees, totalFacturees])
+  const totalBilanNet   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.bilanNet, 0).toFixed(2)), [donneesActuelles])
+  const totalMalusSAV   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0).toFixed(2)), [donneesActuelles])
+
+  // 6. Données dynamiques pour le BarChart Recharts
   const chartData = useMemo(() => {
     return donneesActuelles.map((t) => ({
       nom:         t.nom.split(' ')[0],
@@ -154,6 +177,17 @@ export default function PerformancesRentabiliteView() {
     setDateSelectionnee(vue === 'Jour' ? todayISO : monthISO)
   }
 
+  if (loading && !bilanData) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-yellow-200 border-t-yellow-500 rounded-full animate-spin" />
+          <p className="text-xs font-bold text-slate-500 animate-pulse">Chargement des statistiques en direct...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -165,7 +199,7 @@ export default function PerformancesRentabiliteView() {
               Performances & Rentabilité
             </h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              Analyse de rentabilité — Vue {vueActuelle} ({dateSelectionnee})
+              Analyse de rentabilité — Vue {vueActuelle} ({bilanData?.periode?.label || dateSelectionnee})
             </p>
           </div>
 
@@ -202,7 +236,6 @@ export default function PerformancesRentabiliteView() {
                 type="date"
                 value={dateSelectionnee}
                 onChange={(e) => setDateSelectionnee(e.target.value)}
-                max={todayISO}
                 className="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition cursor-pointer"
               />
             ) : (
@@ -210,7 +243,6 @@ export default function PerformancesRentabiliteView() {
                 type="month"
                 value={dateSelectionnee}
                 onChange={(e) => setDateSelectionnee(e.target.value)}
-                max={monthISO}
                 className="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition cursor-pointer"
               />
             )}
@@ -336,7 +368,7 @@ export default function PerformancesRentabiliteView() {
             <div>
               <h2 className="text-sm font-bold text-slate-700">Tableau de Productivité Détaillé</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Bilan Net = (Facturées − Achetées) − Malus SAV | Prime = max(0, Bilan Net × Taux)
+                Bilan Net = (Facturées − Achetées) − Malus SAV | Prime = max(0, Bilan Net × {tauxCommission} MAD/h)
               </p>
             </div>
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-600">
@@ -427,7 +459,7 @@ export default function PerformancesRentabiliteView() {
                   {tech.prime > 0 ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
                       <IcoStar cls="h-3.5 w-3.5 text-violet-500" />
-                      {fmtMAD(tech.prime)}
+                      {tech.primeFormatted || fmtMAD(tech.prime)}
                     </span>
                   ) : (
                     <span className="text-xs text-slate-300 font-medium">0 MAD</span>
@@ -469,7 +501,7 @@ export default function PerformancesRentabiliteView() {
               Efficacité Globale : <strong className={tauxEfficacite >= 100 ? 'text-emerald-600' : 'text-amber-600'}>{tauxEfficacite}%</strong>
             </span>
             <span className="text-violet-600 font-semibold">
-              Total Primes Estimées : {fmtMAD(totalPrime)}
+              Total Primes Estimées ({tauxCommission} MAD/h) : {fmtMAD(totalPrime)}
             </span>
           </div>
 
