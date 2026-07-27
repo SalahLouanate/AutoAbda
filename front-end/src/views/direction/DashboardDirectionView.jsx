@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import {
   PieChart, Pie, Cell, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
@@ -9,61 +9,67 @@ import echo from '../../echo'
 // ─────────────────────────────────────────────────────────────────────────────
 // ICÔNES SVG inline
 // ─────────────────────────────────────────────────────────────────────────────
-const IcoCar = ({ cls = 'h-4 w-4' }) => (
+const IcoCar = memo(({ cls = 'h-4 w-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 17h8M3 11l2-5h14l2 5M3 11h18v6H3v-6zm3 6v1a1 1 0 002 0v-1m8 0v1a1 1 0 002 0v-1"/>
   </svg>
-)
-const IcoClock = ({ cls = 'h-4 w-4' }) => (
+))
+
+const IcoClock = memo(({ cls = 'h-4 w-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
   </svg>
-)
-const IcoAlert = ({ cls = 'h-4 w-4' }) => (
+))
+
+const IcoAlert = memo(({ cls = 'h-4 w-4' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
   </svg>
-)
-const IcoCheck = ({ cls = 'h-8 w-8' }) => (
+))
+
+const IcoCheck = memo(({ cls = 'h-8 w-8' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
   </svg>
-)
-const IcoGear = ({ cls = 'h-10 w-10' }) => (
+))
+
+const IcoGear = memo(({ cls = 'h-10 w-10' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.4}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
   </svg>
-)
-const IcoWrench = ({ cls = 'h-3.5 w-3.5' }) => (
+))
+
+const IcoWrench = memo(({ cls = 'h-3.5 w-3.5' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.653-4.655m5.867-5.914 1.768 1.768a2.25 2.25 0 0 1 0 3.182l-1.768-1.768a2.25 2.25 0 0 1 0-3.182Z"/>
   </svg>
-)
+))
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DONUT CHART — Taux d'occupation
+// DONUT CHART — Memoized Component
 // ─────────────────────────────────────────────────────────────────────────────
 const DONUT_COLORS = ['#3b82f6', '#22c55e', '#94a3b8']
 
-function DonutTooltip({ active, payload }) {
+const DonutTooltip = memo(function DonutTooltip({ active, payload }) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-lg text-xs font-semibold text-slate-700">
       {payload[0].name} : <span className="font-black">{payload[0].value}</span> pont{payload[0].value > 1 ? 's' : ''}
     </div>
   )
-}
+})
 
-function OccupationDonut({ kpis }) {
+const OccupationDonut = memo(function OccupationDonut({ kpis }) {
   const occupes = kpis?.ponts_occupes ?? 0
   const libres  = kpis?.ponts_libres ?? 0
   const pct     = kpis?.pourcentage_occupation ?? 0
   const total   = occupes + libres || 5
-  const data = [
+  
+  const data = useMemo(() => [
     { name: 'Occupés', value: occupes },
     { name: 'Libres',  value: libres },
-  ]
+  ], [occupes, libres])
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -104,12 +110,12 @@ function OccupationDonut({ kpis }) {
       </div>
     </div>
   )
-}
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BAR CHART — Charge de travail par technicien actif
+// BAR CHART — Memoized Component
 // ─────────────────────────────────────────────────────────────────────────────
-function BarTooltip({ active, payload, label }) {
+const BarTooltip = memo(function BarTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-lg">
@@ -121,14 +127,14 @@ function BarTooltip({ active, payload, label }) {
       ))}
     </div>
   )
-}
+})
 
-function ChargeBarChart({ chargeTravail }) {
-  const data = (chargeTravail || []).map(item => ({
+const ChargeBarChart = memo(function ChargeBarChart({ chargeTravail }) {
+  const data = useMemo(() => (chargeTravail || []).map(item => ({
     nom: item.technicien ? item.technicien.split(' ')[0] : 'Tech',
     'Barème': item.bareme || 60,
     'Passé': item.temps_passe || 0,
-  }))
+  })), [chargeTravail])
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -152,17 +158,16 @@ function ChargeBarChart({ chargeTravail }) {
       </div>
     </div>
   )
-}
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CARTE PONT DYNAMIQUE (Supervision)
+// CARTE PONT DYNAMIQUE (Memoized Component)
 // ─────────────────────────────────────────────────────────────────────────────
-function PontCard({ pont }) {
+const PontCard = memo(function PontCard({ pont }) {
   const statutUpper = pont.statut ? pont.statut.toUpperCase() : 'LIBRE'
   const isMaintenance = statutUpper === 'MAINTENANCE'
   const isLibre = statutUpper === 'LIBRE'
   const isRetard = statutUpper === 'EN_RETARD'
-  const isEnCours = statutUpper === 'EN_COURS'
 
   const technicien = pont.technicien_assigne || 'Technicien non assigné'
   const intervention = pont.intervention
@@ -173,7 +178,6 @@ function PontCard({ pont }) {
   const tempsBareme = intervention?.bareme ?? 60
   const pct = tempsBareme > 0 ? Math.min(100, Math.round((tempsPasse / tempsBareme) * 100)) : 0
 
-  // ── MAINTENANCE ────────────────────────────────────────────────────────
   if (isMaintenance) {
     return (
       <div
@@ -198,7 +202,6 @@ function PontCard({ pont }) {
     )
   }
 
-  // ── LIBRE ──────────────────────────────────────────────────────────────
   if (isLibre) {
     return (
       <div className="rounded-2xl border-2 border-emerald-300 bg-white p-5 shadow-sm flex flex-col gap-3">
@@ -217,7 +220,6 @@ function PontCard({ pont }) {
     )
   }
 
-  // ── EN COURS / EN RETARD ───────────────────────────────────────────────
   const borderCls   = isRetard ? 'border-red-500'   : 'border-blue-400'
   const badgeCls    = isRetard ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
   const trackCls    = isRetard ? 'bg-red-100'        : 'bg-blue-100'
@@ -227,7 +229,6 @@ function PontCard({ pont }) {
 
   return (
     <div className={`rounded-2xl border-2 ${borderCls} bg-white p-5 shadow-sm flex flex-col gap-3 ${pulseCls}`}>
-      {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</p>
         <span className={`text-xs font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${badgeCls}`}>
@@ -235,7 +236,6 @@ function PontCard({ pont }) {
         </span>
       </div>
 
-      {/* Technicien */}
       <div className="flex items-center gap-2">
         <div className={`w-8 h-8 rounded-full ${avatarCls} flex items-center justify-center flex-shrink-0 text-white font-black text-xs`}>
           {technicien.charAt(0)}
@@ -249,13 +249,11 @@ function PontCard({ pont }) {
         </div>
       </div>
 
-      {/* Intervention */}
       <div className="flex items-center gap-1.5 text-xs text-slate-500">
         <IcoWrench cls="h-3.5 w-3.5 flex-shrink-0" />
         <span className="truncate">{interventionType}</span>
       </div>
 
-      {/* Barre de progression */}
       <div>
         <div className={`w-full h-2 rounded-full ${trackCls}`}>
           <div className={`h-2 rounded-full ${barCls} transition-all duration-700`} style={{ width: `${pct}%` }} />
@@ -280,57 +278,101 @@ function PontCard({ pont }) {
       </div>
     </div>
   )
-}
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPOSANT PRINCIPAL — DashboardDirectionView
+// COMPOSANT PRINCIPAL — DashboardDirectionView (Optimsed with Memoization & Smart Echo)
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardDirectionView() {
   const [dashboardData, setDashboardData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // 1. Fonction centrale de récupération silencieuse / complète des données
-  const fetchDashboardData = async (silent = false) => {
+  // 1. Chargement des données via useCallback
+  const fetchDashboardData = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true)
       setError(null)
       const response = await api.get('/direction/dashboard')
-      // Remplace l'intégralité du state global (KPIs + Ponts + Charge de travail) sans mutation partielle
       setDashboardData(response.data)
     } catch (err) {
-      console.error('Erreur lors du chargement des statistiques direction:', err)
+      console.error('Erreur chargement dashboard:', err)
       if (!silent) {
         setError(err.response?.data?.message || 'Impossible de charger la Tour de Contrôle.')
       }
     } finally {
       if (!silent) setLoading(false)
     }
-  }
-
-  // Chargement initial des données au montage du composant
-  useEffect(() => {
-    fetchDashboardData(false)
   }, [])
 
-  // 2. Écouteur WebSocket Laravel Echo sur le canal public 'atelier'
+  useEffect(() => {
+    fetchDashboardData(false)
+  }, [fetchDashboardData])
+
+  // 2. Écouteur WebSocket intelligent : Mise à jour ciblée de l'état local sans re-fetch HTTP lourd
   useEffect(() => {
     const echoInstance = echo || window.Echo
 
     if (echoInstance) {
       const channel = echoInstance.channel('atelier')
 
-      const handleWebSocketEvent = () => {
-        console.log('⚡ Événement WebSocket reçu : Rechargement complet de l\'API Direction...')
-        // Rechargement silencieux de l'intégralité du JSON (/api/direction/dashboard)
-        fetchDashboardData(true)
+      const handleWebSocketEvent = (payload) => {
+        console.log('⚡ Événement Reverb (Payload) :', payload)
+
+        if (!payload || !payload.pont) {
+          // Fallback silencieux en cas de payload incomplet
+          fetchDashboardData(true)
+          return
+        }
+
+        setDashboardData(prev => {
+          if (!prev) return prev
+
+          const isFinished = payload.statut === 'Terminé' || payload.statut === 'Annulé'
+
+          const updatedPonts = prev.ponts.map(p => {
+            if (p.id === payload.pont.id) {
+              return {
+                ...p,
+                statut: isFinished ? 'LIBRE' : (payload.statut === 'Bloqué' ? 'EN_COURS' : 'EN_COURS'),
+                technicien_assigne: payload.technicien?.name || p.technicien_assigne,
+                intervention: isFinished ? null : {
+                  id: payload.id,
+                  vehicule: payload.vehicule ? `${payload.vehicule.marque} ${payload.vehicule.modele}` : 'Véhicule N/A',
+                  matricule: payload.vehicule?.matricule,
+                  type_intervention: payload.type_intervention,
+                  temps_passe: payload.date_debut ? Math.max(0, Math.round((new Date() - new Date(payload.date_debut)) / 60000)) : 0,
+                  bareme: 60,
+                  statut_intervention: payload.statut,
+                  motif_blocage: payload.motif_blocage,
+                }
+              }
+            }
+            return p
+          })
+
+          const occupes = updatedPonts.filter(p => p.statut === 'EN_COURS' || p.statut === 'EN_RETARD').length
+          const libres = updatedPonts.filter(p => p.statut === 'LIBRE').length
+          const total = updatedPonts.length || 5
+
+          return {
+            ...prev,
+            ponts: updatedPonts,
+            kpis: {
+              ...prev.kpis,
+              ponts_occupes: occupes,
+              ponts_libres: libres,
+              pourcentage_occupation: total > 0 ? Math.round((occupes / total) * 100) : 0,
+              terminees_aujourdhui: isFinished ? (prev.kpis.terminees_aujourdhui + 1) : prev.kpis.terminees_aujourdhui,
+            }
+          }
+        })
       }
 
       channel.listen('InterventionStatusChanged', handleWebSocketEvent)
       channel.listen('.InterventionStatusChanged', handleWebSocketEvent)
       channel.listen('.App\\Events\\InterventionStatusChanged', handleWebSocketEvent)
 
-      // Nettoyage impératif de l'écouteur au démontage
       return () => {
         channel.stopListening('InterventionStatusChanged')
         channel.stopListening('.InterventionStatusChanged')
@@ -338,22 +380,23 @@ export default function DashboardDirectionView() {
         echoInstance.leaveChannel('atelier')
       }
     }
-  }, [])
+  }, [fetchDashboardData])
 
-  const kpis = dashboardData?.kpis || {
+  // 3. Valeurs dérivées mémorisées avec useMemo
+  const kpis = useMemo(() => dashboardData?.kpis || {
     ponts_occupes: 0,
     pourcentage_occupation: 0,
     ponts_libres: 0,
     interventions_du_jour: 0,
     terminees_aujourdhui: 0,
-  }
-  const pontsList = dashboardData?.ponts || []
-  const chargeTravail = dashboardData?.charge_travail || []
+  }, [dashboardData?.kpis])
 
-  const now   = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const pontsList = useMemo(() => dashboardData?.ponts || [], [dashboardData?.ponts])
+  const chargeTravail = useMemo(() => dashboardData?.charge_travail || [], [dashboardData?.charge_travail])
 
-  // Chargement simple et élégant
+  const now   = useMemo(() => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }), [])
+  const today = useMemo(() => new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), [])
+
   if (loading && !dashboardData) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
@@ -367,7 +410,6 @@ export default function DashboardDirectionView() {
     )
   }
 
-  // Affichage d'erreur
   if (error && !dashboardData) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
@@ -390,7 +432,6 @@ export default function DashboardDirectionView() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* Animation CSS inline pour la bordure rouge clignotante */}
       <style>{`
         @keyframes borderPulse {
           0%,100% { border-color: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,.2); }
@@ -400,7 +441,7 @@ export default function DashboardDirectionView() {
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        {/* ── EN-TÊTE ────────────────────────────────────────── */}
+        {/* En-tête */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
@@ -416,7 +457,7 @@ export default function DashboardDirectionView() {
           </div>
         </div>
 
-        {/* ── KPI STRIP ──────────────────────────────────────── */}
+        {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
@@ -461,13 +502,13 @@ export default function DashboardDirectionView() {
           ))}
         </div>
 
-        {/* ── GRAPHIQUES RECHARTS ─────────────────────────────── */}
+        {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <OccupationDonut kpis={kpis} />
           <ChargeBarChart chargeTravail={chargeTravail} />
         </div>
 
-        {/* ── GRILLE DES PONTS (SUPERVISION) ───────────────────── */}
+        {/* Grille Ponts */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-700">Supervision des {pontsList.length || 5} Ponts</h2>

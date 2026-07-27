@@ -1,129 +1,195 @@
-import { useState } from 'react'
+import { NavLink } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
-const navItems = [
+const NAV_ITEMS = [
   {
-    id: 'reception',
-    label: 'Réception',
-    sublabel: 'Flux',
+    path: '/direction/dashboard',
+    step: '01',
+    label: 'Dashboard Temps Réel',
+    desc: 'KPIs & flux en direct',
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path d="M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h12V6.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM13.5 15h-12v2.625c0 1.035.84 1.875 1.875 1.875h.375a3 3 0 1 1 6 0h3a.75.75 0 0 0 .75-.75V15Z" />
-        <path d="M8.25 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0ZM15.75 6.75a.75.75 0 0 0-.75.75v11.25c0 .087.015.17.042.248a3 3 0 0 1 5.958.464c.853-.175 1.522-.935 1.464-1.883a18.659 18.659 0 0 0-3.732-10.104 1.837 1.837 0 0 0-1.47-.725H15.75Z" />
-        <path d="M19.5 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z" />
       </svg>
     ),
   },
   {
-    id: 'atelier',
-    label: 'Atelier',
-    sublabel: 'Technicien',
+    path: '/direction/supervision',
+    step: '02',
+    label: 'Supervision Quotidienne',
+    desc: 'Tour de contrôle atelier',
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path fillRule="evenodd" d="M12 6.75a5.25 5.25 0 0 1 6.775-5.025.75.75 0 0 1 .313 1.248l-3.32 3.319c.063.475.276.934.641 1.299.365.365.824.578 1.3.641l3.318-3.319a.75.75 0 0 1 1.248.313 5.25 5.25 0 0 1-5.472 6.756c-1.018-.086-1.87.1-2.309.634L7.344 21.3A3.298 3.298 0 1 1 2.7 16.657l8.684-7.151c.533-.44.72-1.291.634-2.306Z" clipRule="evenodd" />
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+        <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.147.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clipRule="evenodd" />
       </svg>
     ),
   },
   {
-    id: 'direction',
-    label: 'Direction',
-    sublabel: 'Dashboards',
+    path: '/direction/catalogue',
+    step: '03',
+    label: 'Catalogue & Barèmes',
+    desc: 'Tarifs & prestations',
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-        <path d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.75c1.035 0 1.875-.84 1.875-1.875V4.125c0-1.036-.84-1.875-1.875-1.875h-.75ZM9.75 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 0 1-1.875-1.875V8.625ZM3 13.125c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v6.75c0 1.035-.84 1.875-1.875 1.875h-.75A1.875 1.875 0 0 1 3 19.875v-6.75Z" />
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path fillRule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
+    path: '/direction/bilan',
+    step: '04',
+    label: 'Bilan Mensuel & Primes',
+    desc: 'Performance & rémunération',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path d="M10.75 10.818v2.614A3.13 3.13 0 0 0 11.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 0 0-1.138-.432ZM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 0 0-.35.13c-.14.065-.27.143-.386.233-.377.292-.514.627-.514.909 0 .184.058.39.33.615Z" />
+        <path fillRule="evenodd" d="M9.99 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16ZM10 4a6 6 0 1 1 0 12A6 6 0 0 1 10 4Zm-.75 2a.75.75 0 0 1 .75.75V7h.25a1.75 1.75 0 0 1 0 3.5h-.25v2.25a3.13 3.13 0 0 0 1.138-.432c.482-.315.612-.648.612-.875a.75.75 0 0 1 1.5 0c0 .83-.498 1.482-1.108 1.868A4.63 4.63 0 0 1 10 13.75v.5a.75.75 0 0 1-1.5 0v-.625a4.447 4.447 0 0 1-1.624-.684C6.175 12.48 5.75 11.795 5.75 11c0-.83.498-1.482 1.108-1.868A4.63 4.63 0 0 1 8.5 8.25v-.5a.75.75 0 0 1 0-1.5v.5H10V6.75A.75.75 0 0 1 9.25 6Z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
+    path: '/direction/ressources',
+    step: '05',
+    label: 'Gestion des Ressources',
+    desc: 'Personnel & infrastructures',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+        <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.49 15.326a.78.78 0 0 1-.358-.442 3 3 0 0 1 4.308-3.516 6.484 6.484 0 0 0-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 0 1-2.07-.655ZM16.44 15.98a4.97 4.97 0 0 0 2.07-.654.78.78 0 0 0 .357-.442 3 3 0 0 0-4.308-3.517 6.484 6.484 0 0 1 1.907 3.96 2.32 2.32 0 0 1-.026.654ZM18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM5.304 16.19a.844.844 0 0 1-.277-.71 5 5 0 0 1 9.947 0 .843.843 0 0 1-.277.71A6.975 6.975 0 0 1 10 18a6.974 6.974 0 0 1-4.696-1.81Z" />
       </svg>
     ),
   },
 ]
 
-export default function Sidebar({ activeSection, onNavigate }) {
-  return (
-    <aside className="fixed top-0 left-0 h-screen w-64 bg-slate-900 flex flex-col z-40 border-r border-slate-700/50">
-      {/* Logo / Brand */}
-      <div className="px-6 py-6 border-b border-slate-700/50">
+export default function Sidebar({ mobileOpen = false, onClose }) {
+  const { user, logout } = useAuth()
+
+  const handleNavClick = () => {
+    if (onClose) onClose()
+  }
+
+  const renderContent = (isDrawer = false) => (
+    <aside className={`fixed top-0 left-0 h-screen w-64 bg-slate-900 flex flex-col border-r border-slate-700/50 ${
+      isDrawer ? 'z-50' : 'hidden lg:flex z-40'
+    }`}>
+      {/* Logo & Brand */}
+      <div className="px-5 py-5 border-b border-slate-700/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Car icon badge */}
-          <div className="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center shadow-lg shadow-yellow-400/20 shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-slate-900">
-              <path d="M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h12V6.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM13.5 15h-12v2.625c0 1.035.84 1.875 1.875 1.875h.375a3 3 0 1 1 6 0h3a.75.75 0 0 0 .75-.75V15Z" />
-              <path d="M8.25 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0ZM15.75 6.75a.75.75 0 0 0-.75.75v11.25c0 .087.015.17.042.248a3 3 0 0 1 5.958.464c.853-.175 1.522-.935 1.464-1.883a18.659 18.659 0 0 0-3.732-10.104 1.837 1.837 0 0 0-1.47-.725H15.75Z" />
-              <path d="M19.5 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+          <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-400/20">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-slate-900">
+              <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z" />
             </svg>
           </div>
           <div>
-            <p className="text-yellow-400 font-bold text-base leading-tight tracking-wide">
-              AUTO ABDA
-            </p>
-            <p className="text-slate-400 text-xs tracking-widest uppercase">
-              Garage
-            </p>
+            <p className="text-yellow-400 font-bold text-sm tracking-wide">AUTO ABDA</p>
+            <p className="text-slate-500 text-xs">Direction</p>
           </div>
         </div>
+
+        {/* Bouton de fermeture sur tablette/mobile */}
+        {isDrawer && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 flex flex-col gap-1 overflow-y-auto">
-        <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest px-3 mb-3">
-          Navigation
+      {/* Navigation items SPA */}
+      <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
+        <p className="text-slate-600 text-xs font-semibold uppercase tracking-widest px-3 mb-3">
+          Module Direction
         </p>
-
-        {navItems.map((item) => {
-          const isActive = activeSection === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`
-                group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left
-                transition-all duration-200 ease-in-out cursor-pointer
-                ${isActive
-                  ? 'bg-yellow-400/15 text-yellow-400'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
-                }
-              `}
-            >
-              {/* Icon */}
-              <span className={`
-                flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors duration-200
-                ${isActive
-                  ? 'bg-yellow-400/20 text-yellow-400'
-                  : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'
-                }
-              `}>
-                {item.icon}
-              </span>
-
-              {/* Labels */}
-              <div className="flex flex-col min-w-0">
-                <span className="font-semibold text-sm leading-tight">{item.label}</span>
-                <span className={`text-xs leading-tight transition-colors duration-200 ${isActive ? 'text-yellow-400/70' : 'text-slate-500 group-hover:text-slate-400'}`}>
-                  {item.sublabel}
+        {NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            onClick={handleNavClick}
+            className={({ isActive }) => `
+              group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-200 cursor-pointer
+              ${isActive ? 'bg-yellow-400/15 text-yellow-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}
+            `}
+          >
+            {({ isActive }) => (
+              <>
+                <span className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 font-black text-xs transition-colors
+                  ${isActive ? 'bg-yellow-400/20 text-yellow-400' : 'bg-slate-800 text-slate-500 group-hover:bg-slate-700 group-hover:text-slate-300'}`}>
+                  {item.step}
                 </span>
-              </div>
-
-              {/* Active indicator */}
-              {isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />
-              )}
-            </button>
-          )
-        })}
+                <div className="flex flex-col min-w-0">
+                  <span className="font-semibold text-xs leading-tight">{item.label}</span>
+                  <span className={`text-xs leading-tight mt-0.5 ${isActive ? 'text-yellow-400/60' : 'text-slate-600 group-hover:text-slate-400'}`}>{item.desc}</span>
+                </div>
+                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />}
+              </>
+            )}
+          </NavLink>
+        ))}
       </nav>
 
-      {/* Footer */}
-      <div className="px-4 py-4 border-t border-slate-700/50">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-slate-300">
-              <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <p className="text-slate-200 text-xs font-medium truncate">Responsable</p>
-            <p className="text-slate-500 text-xs truncate">Auto Abda</p>
-          </div>
-          <div className="ml-auto w-2 h-2 rounded-full bg-emerald-400 shrink-0" title="En ligne" />
-        </div>
+      {/* Profile & Logout */}
+      <div className="px-4 py-4 border-t border-slate-700/50 flex flex-col gap-3">
+        <NavLink
+          to="/direction/profil"
+          onClick={handleNavClick}
+          className={({ isActive }) => `
+            flex items-center gap-3 px-1 w-full rounded-xl p-2 text-left transition-all
+            ${isActive ? 'bg-yellow-400/10' : 'hover:bg-slate-800'}
+          `}
+        >
+          {({ isActive }) => (
+            <>
+              <div className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
+                <span className="text-slate-900 font-black text-xs">{user?.name?.charAt(0) ?? 'D'}</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-semibold truncate ${isActive ? 'text-yellow-400' : 'text-slate-200'}`}>{user?.name ?? 'Chef d\'Atelier'}</p>
+                <p className="text-yellow-400/70 text-xs truncate">Mon profil &amp; paramètres</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-slate-600 shrink-0">
+                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clipRule="evenodd" />
+              </svg>
+            </>
+          )}
+        </NavLink>
+
+        <button
+          onClick={() => {
+            handleNavClick()
+            logout()
+          }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-700 text-slate-500 hover:text-rose-400 hover:border-rose-400/30 hover:bg-rose-400/5 text-xs font-medium transition-all cursor-pointer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+            <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 0 1 5.25 2h5.5A2.25 2.25 0 0 1 13 4.25v2a.75.75 0 0 1-1.5 0v-2a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75v-2a.75.75 0 0 1 1.5 0v2A2.25 2.25 0 0 1 10.75 18h-5.5A2.25 2.25 0 0 1 3 15.75V4.25Z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M6 10a.75.75 0 0 1 .75-.75h9.546l-1.048-.943a.75.75 0 1 1 1.004-1.114l2.5 2.25a.75.75 0 0 1 0 1.114l-2.5 2.25a.75.75 0 1 1-1.004-1.114l1.048-.943H6.75A.75.75 0 0 1 6 10Z" clipRule="evenodd" />
+          </svg>
+          Déconnexion
+        </button>
       </div>
     </aside>
+  )
+
+  return (
+    <>
+      {/* 1. Rendu Desktop Fixe (Identique à 100%) */}
+      {renderContent(false)}
+
+      {/* 2. Modale / Tiroir sur Tablette & Mobile */}
+      {mobileOpen && (
+        <div className="lg:hidden">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={onClose}
+          />
+          {renderContent(true)}
+        </div>
+      )}
+    </>
   )
 }

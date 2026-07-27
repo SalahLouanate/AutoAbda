@@ -424,7 +424,7 @@ export default function CatalogueInterventionsView() {
         </div>
 
         {/* ── TABLEAU ──────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
 
           {/* En-têtes */}
           <div className="grid grid-cols-12 px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-400 uppercase tracking-wider">

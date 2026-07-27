@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vehicule extends Model
@@ -24,5 +25,13 @@ class Vehicule extends Model
     public function interventions(): HasMany
     {
         return $this->hasMany(Intervention::class);
+    }
+
+    /**
+     * Get all prestations associated with the vehicle (Many-to-Many via pivot).
+     */
+    public function prestations(): BelongsToMany
+    {
+        return $this->belongsToMany(Prestation::class, 'prestation_vehicule')->withTimestamps();
     }
 }

@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Models\Vehicule;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class InterventionSeeder extends Seeder
 {
@@ -37,12 +36,13 @@ class InterventionSeeder extends Seeder
         }
 
         // Récupération des techniciens et des ponts
-        $yassir = User::where('email', 'y.zimi@autoabda.ma')->first();
-        $mustapha = User::where('email', 'm.mustapha@autoabda.ma')->first();
-        $karim = User::where('email', 'k.amrani@autoabda.ma')->first();
-        $allTechniciens = User::where('role', 'technicien')->get();
+        $techniciens = User::where('role', 'technicien')->get();
+        $yassir = $techniciens->where('email', 'y.zimi@autoabda.ma')->first();
+        $mustapha = $techniciens->where('email', 'm.mustapha@autoabda.ma')->first();
+        $karim = $techniciens->where('email', 'k.amrani@autoabda.ma')->first();
+        $hamza = $techniciens->where('email', 'h.bennani@autoabda.ma')->first();
+        $sofiane = $techniciens->where('email', 's.touati@autoabda.ma')->first();
 
-        // 2. Historique : 15 interventions 'Terminé' réparties sur les 7 derniers jours
         $typesInterventions = [
             'Vidange & Filtres',
             'Diagnostic Électronique',
@@ -56,14 +56,40 @@ class InterventionSeeder extends Seeder
             'Diagnostic Moteur',
         ];
 
-        for ($i = 0; $i < 15; $i++) {
+        // 2. Interventions 'Terminé' pour AUJOURD'HUI (journée en cours)
+        for ($i = 0; $i < 8; $i++) {
             $vehicule = $vehicules[$i % count($vehicules)];
-            $tech = $allTechniciens->random();
+            $tech = $techniciens[$i % count($techniciens)];
+            $pontId = $tech->pont_id ?? (($i % 5) + 1);
+
+            $startHour = 8 + ($i % 4);
+            $durationMinutes = 45 + ($i * 10);
+
+            $dateDebut = Carbon::today()->setTime($startHour, 0);
+            $dateFin = (clone $dateDebut)->addMinutes($durationMinutes);
+
+            Intervention::create([
+                'vehicule_id'       => $vehicule->id,
+                'user_id'           => $tech->id,
+                'pont_id'           => $pontId,
+                'type_intervention' => $typesInterventions[$i % count($typesInterventions)],
+                'statut'            => 'Terminé',
+                'date_debut'        => $dateDebut,
+                'date_fin'          => $dateFin,
+                'created_at'        => $dateDebut,
+                'updated_at'        => $dateFin,
+            ]);
+        }
+
+        // 3. Historique : 12 interventions 'Terminé' sur les 7 derniers jours
+        for ($i = 0; $i < 12; $i++) {
+            $vehicule = $vehicules[($i + 3) % count($vehicules)];
+            $tech = $techniciens->random();
             $pontId = $tech->pont_id ?? rand(1, 5);
 
             $daysAgo = rand(1, 7);
-            $startHour = rand(8, 16);
-            $durationMinutes = rand(45, 150);
+            $startHour = rand(8, 15);
+            $durationMinutes = rand(40, 120);
 
             $dateDebut = Carbon::now()->subDays($daysAgo)->setTime($startHour, rand(0, 59));
             $dateFin = (clone $dateDebut)->addMinutes($durationMinutes);
@@ -81,16 +107,16 @@ class InterventionSeeder extends Seeder
             ]);
         }
 
-        // 3. Données en temps réel pour aujourd'hui
+        // 4. Interventions actives pour aujourd'hui sur les ponts
         $pont1 = Pont::find(1);
         if ($yassir && $pont1) {
             Intervention::create([
-                'vehicule_id'       => $vehicules[0]->id, // Renault Express 2021
+                'vehicule_id'       => $vehicules[0]->id,
                 'user_id'           => $yassir->id,
                 'pont_id'           => $pont1->id,
                 'type_intervention' => 'Vidange & Filtres Complexe',
                 'statut'            => 'En cours',
-                'date_debut'        => Carbon::now()->subHours(2),
+                'date_debut'        => Carbon::now()->subHours(1),
                 'date_fin'          => null,
             ]);
             $pont1->update(['statut' => 'Occupé']);
@@ -99,7 +125,7 @@ class InterventionSeeder extends Seeder
         $pont2 = Pont::find(2);
         if ($mustapha && $pont2) {
             Intervention::create([
-                'vehicule_id'       => $vehicules[1]->id, // Dacia Logan
+                'vehicule_id'       => $vehicules[1]->id,
                 'user_id'           => $mustapha->id,
                 'pont_id'           => $pont2->id,
                 'type_intervention' => 'Diagnostic Électronique',
@@ -111,19 +137,46 @@ class InterventionSeeder extends Seeder
         }
 
         $pont3 = Pont::find(3);
-        if ($pont3) {
+        if ($karim && $pont3) {
             Intervention::create([
-                'vehicule_id'       => $vehicules[2]->id, // Dacia Duster
-                'user_id'           => $karim ? $karim->id : null,
+                'vehicule_id'       => $vehicules[2]->id,
+                'user_id'           => $karim->id,
                 'pont_id'           => $pont3->id,
-                'type_intervention' => 'Changement des Freins',
+                'type_intervention' => 'Changement Plaquettes de Frein',
+                'statut'            => 'En cours',
+                'date_debut'        => Carbon::now()->subMinutes(15),
+                'date_fin'          => null,
+            ]);
+            $pont3->update(['statut' => 'Occupé']);
+        }
+
+        $pont4 = Pont::find(4);
+        if ($hamza && $pont4) {
+            Intervention::create([
+                'vehicule_id'       => $vehicules[3]->id,
+                'user_id'           => $hamza->id,
+                'pont_id'           => $pont4->id,
+                'type_intervention' => 'Révision Générale',
+                'statut'            => 'Bloqué',
+                'motif_blocage'     => 'En attente de pièces de rechange',
+                'date_debut'        => Carbon::now()->subHours(2),
+                'date_fin'          => null,
+            ]);
+            $pont4->update(['statut' => 'Occupé']);
+        }
+
+        $pont5 = Pont::find(5);
+        if ($sofiane && $pont5) {
+            Intervention::create([
+                'vehicule_id'       => $vehicules[4]->id,
+                'user_id'           => $sofiane->id,
+                'pont_id'           => $pont5->id,
+                'type_intervention' => 'Changement Courroie de Distribution',
                 'statut'            => 'En attente',
                 'date_debut'        => null,
                 'date_fin'          => null,
             ]);
-            $pont3->update(['statut' => 'Libre']);
+            $pont5->update(['statut' => 'Libre']);
         }
-
-        Pont::whereIn('id', [4, 5])->update(['statut' => 'Libre']);
     }
 }

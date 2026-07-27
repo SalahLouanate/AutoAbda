@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Prestation extends Model
 {
@@ -16,4 +17,12 @@ class Prestation extends Model
         'tarif',
         'description',
     ];
+
+    /**
+     * Get all vehicles associated with this prestation (Many-to-Many via pivot).
+     */
+    public function vehicules(): BelongsToMany
+    {
+        return $this->belongsToMany(Vehicule::class, 'prestation_vehicule')->withTimestamps();
+    }
 }

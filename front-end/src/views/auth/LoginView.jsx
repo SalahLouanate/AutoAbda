@@ -41,8 +41,11 @@ export default function LoginView() {
         auth.login(user)
       }
 
-      if (user.role === 'technicien') {
-        navigate('/technicien')
+      const role = user.role?.toLowerCase()
+      if (role === 'technicien') {
+        navigate('/technicien/dashboard')
+      } else if (role === 'reception' || role === 'receptionniste') {
+        navigate('/reception/dashboard')
       } else {
         navigate('/direction/dashboard')
       }

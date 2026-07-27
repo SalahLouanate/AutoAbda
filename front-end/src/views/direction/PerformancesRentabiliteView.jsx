@@ -333,7 +333,7 @@ export default function PerformancesRentabiliteView() {
         </div>
 
         {/* ── BARCHART RECHARTS ──────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-x-auto">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
             <div>
               <h2 className="text-sm font-bold text-slate-700">Heures Achetées vs Facturées par Technicien</h2>
@@ -361,7 +361,7 @@ export default function PerformancesRentabiliteView() {
         </div>
 
         {/* ── TABLEAU DÉTAILLÉ DE PRODUCTIVITÉ (GRID 12 COLONNES UNIFORME) ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
 
           {/* Header section */}
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">

@@ -39,6 +39,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'direction',
             'pont_id' => null,
+            'is_active' => true,
         ]);
 
         User::create([
@@ -47,6 +48,7 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'reception',
             'pont_id' => null,
+            'is_active' => true,
         ]);
 
         $techniciens = [
@@ -59,17 +61,18 @@ class DatabaseSeeder extends Seeder
 
         foreach ($techniciens as $tech) {
             User::create([
-                'name'     => $tech['name'],
-                'email'    => $tech['email'],
-                'password' => Hash::make('password'),
-                'role'     => 'technicien',
-                'pont_id'  => $tech['pont_id'],
+                'name'      => $tech['name'],
+                'email'     => $tech['email'],
+                'password'  => Hash::make('password'),
+                'role'      => 'technicien',
+                'pont_id'   => $tech['pont_id'],
+                'is_active' => true,
             ]);
         }
 
         $this->call([
-            InterventionSeeder::class,
             PrestationSeeder::class,
+            InterventionSeeder::class,
         ]);
     }
 }

@@ -28,13 +28,19 @@ class DirectionController extends Controller
     }
 
     /**
-     * Helper pour obtenir le tarif théorique d'une prestation.
+     * Helper pour obtenir le tarif théorique d'une prestation (avec cache en mémoire).
      */
-    private function getTarifPrestation(?string $type): float
+    private function getTarifPrestation(?string $type, $prestationsMap = null): float
     {
-        $prestation = Prestation::where('nom', $type)->first();
-        if ($prestation) {
-            return (float) $prestation->tarif;
+        if ($type && $prestationsMap && isset($prestationsMap[$type])) {
+            return (float) $prestationsMap[$type]->tarif;
+        }
+
+        if ($type && !$prestationsMap) {
+            $prestation = Prestation::where('nom', $type)->first();
+            if ($prestation) {
+                return (float) $prestation->tarif;
+            }
         }
 
         $typeLower = mb_strtolower($type ?? '');
@@ -293,6 +299,9 @@ class DirectionController extends Controller
             ->where('is_active', true)
             ->get();
 
+        // Préchargement en mémoire du catalogue de prestations pour éviter les requêtes N+1
+        $prestationsMap = Prestation::all()->keyBy('nom');
+
         $chiffreAffairesTotal = 0;
         $tempsBaremeGlobalMin = 0;
         $tempsPasseGlobalMin = 0;
@@ -323,7 +332,7 @@ class DirectionController extends Controller
                 }
                 $tempsPasseMinSum += $tempsPasse;
 
-                $tarif = $this->getTarifPrestation($item->type_intervention);
+                $tarif = $this->getTarifPrestation($item->type_intervention, $prestationsMap);
                 $caTech += $tarif;
             }
 

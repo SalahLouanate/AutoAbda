@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CatalogueController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DirectionController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ReceptionController;
 use App\Http\Controllers\Api\RessourceController;
 use App\Http\Controllers\Api\TechnicienController;
 use Illuminate\Http\Request;
@@ -52,4 +53,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/technicien/tache/{id}/block', [TechnicienController::class, 'blockTask']);
     Route::post('/technicien/tache/{id}/finish', [TechnicienController::class, 'finishTask']);
     Route::get('/technicien/historique', [TechnicienController::class, 'getHistory']);
+
+    // Routes Module Réception
+    Route::prefix('reception')->group(function () {
+        Route::get('/interventions', [ReceptionController::class, 'getInterventions']);
+        Route::post('/tickets', [ReceptionController::class, 'storeTicket']);
+    });
 });

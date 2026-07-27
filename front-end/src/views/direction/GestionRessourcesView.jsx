@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../../api/axios'
+import ConfirmModal from '../../components/ConfirmModal'
 
 const STATUTS_JOUR = ['Présent', 'Absent', 'En congé']
 
@@ -534,11 +535,20 @@ export default function GestionRessourcesView() {
     }
   }
 
-  // ── Suppression Définitive ────────────────────────────────────────────────
-  const deletePersonnel = async (id, nom) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer définitivement ${nom || 'cet utilisateur'} ?`)) {
-      return
-    }
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [userToDelete,       setUserToDelete]       = useState(null)
+
+  // ── Suppression Définitive (Modale) ───────────────────────────────────────
+  const requestDeletePersonnel = (id, nom) => {
+    setUserToDelete({ id, nom })
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmDeletePersonnel = async () => {
+    if (!userToDelete) return
+    const { id } = userToDelete
+    setIsDeleteModalOpen(false)
+    setUserToDelete(null)
 
     try {
       // 1. Suppression optimiste locale
@@ -709,7 +719,7 @@ export default function GestionRessourcesView() {
           </div>
 
           {/* Tableau */}
-          <div className="overflow-hidden rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
             {/* En-têtes */}
             <div className="grid grid-cols-12 px-4 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               <div className="col-span-3">Nom</div>
@@ -794,7 +804,7 @@ export default function GestionRessourcesView() {
 
                       {/* Bouton Suppression Définitive */}
                       <button
-                        onClick={() => deletePersonnel(tech.id, tech.nom)}
+                        onClick={() => requestDeletePersonnel(tech.id, tech.nom)}
                         title="Supprimer définitivement"
                         className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                       >
@@ -895,6 +905,21 @@ export default function GestionRessourcesView() {
         pontsLibres={pontsLibres}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
+      />
+
+      {/* ── MODALE SUPPRESSION DÉFINITIVE ──────────────────────── */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Suppression définitive"
+        message={`Voulez-vous vraiment supprimer définitivement ${userToDelete?.nom || 'cet utilisateur'} ? Cette action est irréversible.`}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        confirmColor="red"
+        onConfirm={confirmDeletePersonnel}
+        onCancel={() => {
+          setIsDeleteModalOpen(false)
+          setUserToDelete(null)
+        }}
       />
     </div>
   )

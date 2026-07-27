@@ -4,6 +4,7 @@ import {
   ListTodo, TrendingUp, User, ShieldAlert, X, LogOut, RefreshCw, Calendar, PauseCircle
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import ConfirmModal from '../../components/ConfirmModal'
 import api from '../../api/axios'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -203,15 +204,20 @@ export default function TechnicienDashboardView() {
     }
   }
 
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+
   // 6. Action : Déconnexion propre
-  const handleLogout = async () => {
-    if (window.confirm('Voulez-vous clôturer votre session et vous déconnecter ?')) {
-      if (auth?.logout) {
-        await auth.logout()
-      } else {
-        localStorage.removeItem('token')
-        window.location.href = '/'
-      }
+  const handleLogout = () => {
+    setIsLogoutModalOpen(true)
+  }
+
+  const confirmLogout = async () => {
+    setIsLogoutModalOpen(false)
+    if (auth?.logout) {
+      await auth.logout()
+    } else {
+      localStorage.removeItem('token')
+      window.location.href = '/'
     }
   }
 
@@ -695,6 +701,18 @@ export default function TechnicienDashboardView() {
           </div>
         </div>
       )}
+
+      {/* MODALE DE CONFIRMATION DE DÉCONNEXION */}
+      <ConfirmModal
+        isOpen={isLogoutModalOpen}
+        title="Déconnexion"
+        message="Voulez-vous clôturer votre session et vous déconnecter ?"
+        confirmText="Se déconnecter"
+        cancelText="Annuler"
+        confirmColor="blue"
+        onConfirm={confirmLogout}
+        onCancel={() => setIsLogoutModalOpen(false)}
+      />
 
     </div>
   )
