@@ -19,7 +19,18 @@ export default function SupervisionQuotidienneView() {
   const [error, setError] = useState(null)
   const [technicienActifId, setTechnicienActifId] = useState(null)
 
-  // 2. Appel API vers /api/direction/supervision avec transmission du filtre date ({ params: { date: dateFiltre } })
+  // Chronomètre temps réel : rafraîchissement dynamique des temps passés toutes les 10 secondes
+  const [nowTick, setNowTick] = useState(Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTick(Date.now())
+    }, 10000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  // 2. Appel API vers /api/direction/supervision avec transmission du filtre date
   const fetchSupervisionData = async (silent = false) => {
     try {
       if (!silent) setLoading(true)
@@ -44,29 +55,59 @@ export default function SupervisionQuotidienneView() {
     fetchSupervisionData(false)
   }, [dateFiltre])
 
-  // 3. Écouteur temps réel dédié avec Laravel Echo (Reverb) sur le canal 'atelier'
+  // 3. Écouteur temps réel dédié avec Laravel Echo (Reverb) sur les canaux 'garage' et 'atelier'
   useEffect(() => {
     const echoInstance = echo || window.Echo
 
     if (echoInstance) {
-      const channel = echoInstance.channel('atelier')
+      const atelierChannel = echoInstance.channel('atelier')
+      const garageChannel = echoInstance.channel('garage')
 
       const handleWebSocketEvent = (eventData) => {
         console.log('⚡ Événement temps réel Reverb capté sur la supervision quotidienne:', eventData)
-        // Rechargement silencieux des données fraîches pour la date actuellement sélectionnée
+        
+        // Mise à jour instantanée en mémoire locale si l'ID d'intervention correspond
+        if (eventData && eventData.id) {
+          setInterventionsList((prevList) =>
+            prevList.map((item) =>
+              item.id === eventData.id
+                ? {
+                    ...item,
+                    statut: eventData.statut || item.statut,
+                    motif_blocage: eventData.motif_blocage ?? item.motif_blocage,
+                    date_debut: eventData.date_debut || item.date_debut,
+                  }
+                : item
+            )
+          )
+        }
+
+        // Rafraîchissement silencieux des données fraîches
         fetchSupervisionData(true)
       }
 
-      channel.listen('InterventionStatusChanged', handleWebSocketEvent)
-      channel.listen('.InterventionStatusChanged', handleWebSocketEvent)
-      channel.listen('.App\\Events\\InterventionStatusChanged', handleWebSocketEvent)
+      atelierChannel.listen('InterventionStatusChanged', handleWebSocketEvent)
+      atelierChannel.listen('.InterventionStatusChanged', handleWebSocketEvent)
+      atelierChannel.listen('.intervention.updated', handleWebSocketEvent)
+
+      garageChannel.listen('TicketStatusUpdated', handleWebSocketEvent)
+      garageChannel.listen('.TicketStatusUpdated', handleWebSocketEvent)
+      garageChannel.listen('TicketCreated', handleWebSocketEvent)
+      garageChannel.listen('.TicketCreated', handleWebSocketEvent)
 
       // Nettoyage impératif de l'écouteur au démontage
       return () => {
-        channel.stopListening('InterventionStatusChanged')
-        channel.stopListening('.InterventionStatusChanged')
-        channel.stopListening('.App\\Events\\InterventionStatusChanged')
+        atelierChannel.stopListening('InterventionStatusChanged')
+        atelierChannel.stopListening('.InterventionStatusChanged')
+        atelierChannel.stopListening('.intervention.updated')
+
+        garageChannel.stopListening('TicketStatusUpdated')
+        garageChannel.stopListening('.TicketStatusUpdated')
+        garageChannel.stopListening('TicketCreated')
+        garageChannel.stopListening('.TicketCreated')
+
         echoInstance.leaveChannel('atelier')
+        echoInstance.leaveChannel('garage')
       }
     }
   }, [dateFiltre])
@@ -76,7 +117,7 @@ export default function SupervisionQuotidienneView() {
 
   interventionsList.forEach((item) => {
     const techId = item.technicien?.id || 0
-    const techNom = item.technicien?.nom_complet || 'Technicien Non Assigné'
+    const techNom = item.technicien?.nom_complet || item.technicien?.nom || item.technicien?.name || 'Technicien Non Assigné'
 
     if (!equipeMap[techId]) {
       equipeMap[techId] = {
@@ -88,13 +129,25 @@ export default function SupervisionQuotidienneView() {
       }
     }
 
+    // Récupération dynamique du barème réel et calcul live du temps passé (Date.now() - started_at)
+    const baremeMin = item.temps_bareme_total ?? item.bareme ?? 60
+    const dateDebutISO = item.started_at || item.date_debut
+
+    let tempsPasseMin = item.temps_passe || 0
+    if (item.statut === 'En cours' && dateDebutISO) {
+      const startMs = new Date(dateDebutISO).getTime()
+      if (!isNaN(startMs)) {
+        tempsPasseMin = Math.max(0, Math.floor((nowTick - startMs) / 60000))
+      }
+    }
+
     // Conversion en heures décimales pour la fonction formaterTemps
-    const tempsBaremeH = (item.bareme || 60) / 60
-    const tempsPasseH  = (item.temps_passe || 0) / 60
+    const tempsBaremeH = baremeMin / 60
+    const tempsPasseH  = tempsPasseMin / 60
 
     equipeMap[techId].interventions.push({
       id: item.id,
-      vehicule: item.vehicule ? `${item.vehicule.nom_complet} (${item.vehicule.matricule})` : 'Véhicule N/A',
+      vehicule: item.vehicule ? `${item.vehicule.nom_complet || item.vehicule.marque} (${item.vehicule.matricule})` : 'Véhicule N/A',
       clientNom: item.client?.nom || 'Client Particulier',
       clientTel: item.client?.telephone || 'Non renseigné',
       type: item.type_intervention,
@@ -102,6 +155,9 @@ export default function SupervisionQuotidienneView() {
       motifBlocage: item.motif_blocage,
       tempsBareme: tempsBaremeH,
       tempsPasse: tempsPasseH,
+      startedAt: dateDebutISO,
+      baremeMin: baremeMin,
+      tempsPasseMin: tempsPasseMin,
       heureArrivee: item.heure_arrivee,
       pontNom: item.pont?.nom || 'Non affecté',
     })
@@ -353,7 +409,7 @@ export default function SupervisionQuotidienneView() {
                     </div>
                   </div>
 
-                  {/* COL 4 — Barre de Progression Rendement (Plafonnée à 100% max + Retard en h/m) */}
+                  {/* COL 4 — Barre de Progression Rendement */}
                   <div className="md:col-span-5 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-medium text-slate-500">
@@ -391,7 +447,7 @@ export default function SupervisionQuotidienneView() {
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 016 0z" />
                       </svg>
                       Détails
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-0 -ml-1 group-hover/btn:opacity-100 group-hover/btn:ml-0 transition-all duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -500,17 +556,14 @@ export default function SupervisionQuotidienneView() {
                       let statusBadge = null
                       if (intervention.statut === 'En cours') {
                         statusBadge = (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-                            <svg className="animate-spin -ml-0.5 h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
                             En cours
                           </span>
                         )
                       } else if (intervention.statut === 'Terminé') {
                         statusBadge = (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
@@ -519,13 +572,13 @@ export default function SupervisionQuotidienneView() {
                         )
                       } else if (intervention.statut === 'En attente') {
                         statusBadge = (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
                             En attente
                           </span>
                         )
                       } else if (intervention.statut === 'Bloqué') {
                         statusBadge = (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
@@ -562,7 +615,7 @@ export default function SupervisionQuotidienneView() {
                             <div>{statusBadge}</div>
                           </div>
 
-                          {/* ⚠️ BANNIÈRE D'ALERTE ROUGE CONDITIONNELLE MOTIF DE BLOCAGE */}
+                          {/* BANNIÈRE D'ALERTE ROUGE CONDITIONNELLE MOTIF DE BLOCAGE */}
                           {intervention.statut === 'Bloqué' && (
                             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3.5 rounded-r-xl shadow-xs font-semibold my-2 flex items-start gap-2.5">
                               <span className="text-base leading-none shrink-0 mt-0.5">⚠️</span>

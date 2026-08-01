@@ -202,71 +202,69 @@ const PontCard = memo(function PontCard({ pont }) {
     )
   }
 
-  if (isLibre) {
+  if (isLibre || !intervention) {
     return (
-      <div className="rounded-2xl border-2 border-emerald-300 bg-white p-5 shadow-sm flex flex-col gap-3">
+      <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-5 shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</p>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase tracking-wider">Libre</span>
+          <span className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</span>
+          <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
+            Libre
+          </span>
         </div>
-        <div className="flex flex-col items-center justify-center gap-2 py-5">
-          <IcoCheck cls="h-10 w-10 text-emerald-400" />
-          <p className="text-sm font-semibold text-emerald-600">Prêt à l'emploi</p>
-          <p className="text-xs text-slate-400 text-center">
-            {technicien ? `Assigné à : ${technicien}` : 'Aucune intervention active'}
-          </p>
+        <div className="flex flex-col items-center justify-center py-6 text-emerald-400">
+          <IcoCheck cls="h-10 w-10 text-emerald-500 mb-1" />
+          <p className="text-xs font-bold text-emerald-700">Disponible pour affectation</p>
+          <p className="text-[11px] text-emerald-600/80 mt-0.5 font-medium">{technicien}</p>
+        </div>
+        <div className="text-center pt-2 border-t border-emerald-200/60 text-emerald-700 text-xs font-semibold">
+          Prêt à recevoir un véhicule
         </div>
       </div>
     )
   }
 
-  const borderCls   = isRetard ? 'border-red-500'   : 'border-blue-400'
-  const badgeCls    = isRetard ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
-  const trackCls    = isRetard ? 'bg-red-100'        : 'bg-blue-100'
-  const barCls      = isRetard ? 'bg-red-500'        : 'bg-blue-500'
-  const avatarCls   = isRetard ? 'bg-red-500'        : 'bg-blue-500'
-  const pulseCls    = isRetard ? 'pont-retard'       : ''
-
   return (
-    <div className={`rounded-2xl border-2 ${borderCls} bg-white p-5 shadow-sm flex flex-col gap-3 ${pulseCls}`}>
+    <div className={`rounded-2xl border-2 p-5 shadow-sm flex flex-col justify-between bg-white ${
+      isRetard ? 'border-red-400 bg-red-50/30' : 'border-blue-300'
+    }`}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</p>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${badgeCls}`}>
-          {isRetard ? 'En retard' : (intervention?.statut_intervention === 'Bloqué' ? 'Bloqué' : 'En cours')}
+        <span className="text-sm font-bold text-slate-800">{pont.nom || `Pont ${pont.id}`}</span>
+        <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${
+          isRetard ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-blue-100 text-blue-700 border-blue-300'
+        }`}>
+          {isRetard ? 'En retard' : 'En cours'}
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className={`w-8 h-8 rounded-full ${avatarCls} flex items-center justify-center flex-shrink-0 text-white font-black text-xs`}>
-          {technicien.charAt(0)}
+      <div className="my-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <IcoCar cls="h-4 w-4 text-slate-500 shrink-0" />
+          <span className="text-sm font-black text-slate-800 truncate">{vehiculeLabel}</span>
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-800 truncate">{technicien}</p>
-          <div className="flex items-center gap-1 text-xs text-slate-400">
-            <IcoCar cls="h-3.5 w-3.5" />
-            <span className="font-mono truncate">{vehiculeLabel}</span>
-          </div>
+
+        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+          <IcoWrench cls="h-3.5 w-3.5 text-blue-600 shrink-0" />
+          <span className="truncate">{interventionType}</span>
+        </div>
+
+        <div className="text-xs text-slate-500">
+          Tech : <strong className="text-slate-800 font-bold">{technicien}</strong>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-        <IcoWrench cls="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{interventionType}</span>
-      </div>
+      <div className="pt-2 border-t border-slate-100 space-y-1.5">
+        <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+          <span>Temps passé : {tempsPasse} min</span>
+          <span className="text-slate-400">Réf : {tempsBareme} min</span>
+        </div>
 
-      <div>
-        <div className={`w-full h-2 rounded-full ${trackCls}`}>
-          <div className={`h-2 rounded-full ${barCls} transition-all duration-700`} style={{ width: `${pct}%` }} />
+        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${isRetard ? 'bg-red-500' : 'bg-blue-600'}`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
-        <div className="flex items-center justify-between mt-1.5">
-          <div className="flex items-center gap-1">
-            <IcoClock cls="h-3.5 w-3.5 text-slate-400" />
-            <span className={`text-xs font-bold ${isRetard ? 'text-red-600' : 'text-slate-600'}`}>
-              {tempsPasse} min passées
-            </span>
-          </div>
-          <span className="text-xs text-slate-400">/ {tempsBareme} min réf</span>
-        </div>
+
         {isRetard && (
           <div className="flex items-center gap-1 mt-1.5 bg-red-50 rounded-lg px-2 py-1">
             <IcoAlert cls="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
@@ -288,13 +286,33 @@ export default function DashboardDirectionView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // 1. Chargement des données via useCallback
+  // Initialisation des KPIs dynamiques du jour avec état initial propre
+  const [kpis, setKpis] = useState({
+    total_aujourdhui: 0,
+    cloturees_aujourdhui: 0,
+    ponts_occupes: 0,
+    ponts_libres: 5,
+    pourcentage_occupation: 0,
+  })
+
+  // 1. Chargement des données via useCallback & Axios GET /api/direction/dashboard
   const fetchDashboardData = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true)
       setError(null)
       const response = await api.get('/direction/dashboard')
-      setDashboardData(response.data)
+      if (response.data) {
+        setDashboardData(response.data)
+        const d = response.data
+        const loadedKpis = response.data.kpis || response.data
+        setKpis({
+          total_aujourdhui:       loadedKpis.total_aujourdhui       ?? loadedKpis.interventions_du_jour ?? d.total_aujourdhui       ?? 0,
+          cloturees_aujourdhui:    loadedKpis.cloturees_aujourdhui    ?? loadedKpis.terminees_aujourdhui  ?? d.cloturees_aujourdhui    ?? 0,
+          ponts_occupes:          loadedKpis.ponts_occupes          ?? d.ponts_occupes                  ?? 0,
+          ponts_libres:           loadedKpis.ponts_libres           ?? d.ponts_libres                   ?? 5,
+          pourcentage_occupation: loadedKpis.pourcentage_occupation ?? d.pourcentage_occupation         ?? 0,
+        })
+      }
     } catch (err) {
       console.error('Erreur chargement dashboard:', err)
       if (!silent) {
@@ -309,88 +327,30 @@ export default function DashboardDirectionView() {
     fetchDashboardData(false)
   }, [fetchDashboardData])
 
-  // 2. Écouteur WebSocket intelligent : Mise à jour ciblée de l'état local sans re-fetch HTTP lourd
+  // 2. Écouteur WebSocket Reverb dédié sur le canal public 'atelier'
   useEffect(() => {
     const echoInstance = echo || window.Echo
 
     if (echoInstance) {
       const channel = echoInstance.channel('atelier')
 
-      const handleWebSocketEvent = (payload) => {
-        console.log('⚡ Événement Reverb (Payload) :', payload)
-
-        if (!payload || !payload.pont) {
-          // Fallback silencieux en cas de payload incomplet
-          fetchDashboardData(true)
-          return
-        }
-
-        setDashboardData(prev => {
-          if (!prev) return prev
-
-          const isFinished = payload.statut === 'Terminé' || payload.statut === 'Annulé'
-
-          const updatedPonts = prev.ponts.map(p => {
-            if (p.id === payload.pont.id) {
-              return {
-                ...p,
-                statut: isFinished ? 'LIBRE' : (payload.statut === 'Bloqué' ? 'EN_COURS' : 'EN_COURS'),
-                technicien_assigne: payload.technicien?.name || p.technicien_assigne,
-                intervention: isFinished ? null : {
-                  id: payload.id,
-                  vehicule: payload.vehicule ? `${payload.vehicule.marque} ${payload.vehicule.modele}` : 'Véhicule N/A',
-                  matricule: payload.vehicule?.matricule,
-                  type_intervention: payload.type_intervention,
-                  temps_passe: payload.date_debut ? Math.max(0, Math.round((new Date() - new Date(payload.date_debut)) / 60000)) : 0,
-                  bareme: 60,
-                  statut_intervention: payload.statut,
-                  motif_blocage: payload.motif_blocage,
-                }
-              }
-            }
-            return p
-          })
-
-          const occupes = updatedPonts.filter(p => p.statut === 'EN_COURS' || p.statut === 'EN_RETARD').length
-          const libres = updatedPonts.filter(p => p.statut === 'LIBRE').length
-          const total = updatedPonts.length || 5
-
-          return {
-            ...prev,
-            ponts: updatedPonts,
-            kpis: {
-              ...prev.kpis,
-              ponts_occupes: occupes,
-              ponts_libres: libres,
-              pourcentage_occupation: total > 0 ? Math.round((occupes / total) * 100) : 0,
-              terminees_aujourdhui: isFinished ? (prev.kpis.terminees_aujourdhui + 1) : prev.kpis.terminees_aujourdhui,
-            }
-          }
-        })
+      const handleInterventionUpdated = (e) => {
+        console.log('⚡ Événement Reverb (intervention.updated) capté sur Dashboard Direction :', e)
+        fetchDashboardData(true)
       }
 
-      channel.listen('InterventionStatusChanged', handleWebSocketEvent)
-      channel.listen('.InterventionStatusChanged', handleWebSocketEvent)
-      channel.listen('.App\\Events\\InterventionStatusChanged', handleWebSocketEvent)
+      channel.listen('.intervention.updated', handleInterventionUpdated)
+      channel.listen('intervention.updated', handleInterventionUpdated)
 
       return () => {
-        channel.stopListening('InterventionStatusChanged')
-        channel.stopListening('.InterventionStatusChanged')
-        channel.stopListening('.App\\Events\\InterventionStatusChanged')
+        channel.stopListening('.intervention.updated')
+        channel.stopListening('intervention.updated')
         echoInstance.leaveChannel('atelier')
       }
     }
   }, [fetchDashboardData])
 
   // 3. Valeurs dérivées mémorisées avec useMemo
-  const kpis = useMemo(() => dashboardData?.kpis || {
-    ponts_occupes: 0,
-    pourcentage_occupation: 0,
-    ponts_libres: 0,
-    interventions_du_jour: 0,
-    terminees_aujourdhui: 0,
-  }, [dashboardData?.kpis])
-
   const pontsList = useMemo(() => dashboardData?.ponts || [], [dashboardData?.ponts])
   const chargeTravail = useMemo(() => dashboardData?.charge_travail || [], [dashboardData?.charge_travail])
 
@@ -410,122 +370,87 @@ export default function DashboardDirectionView() {
     )
   }
 
-  if (error && !dashboardData) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
-        <div className="bg-white border border-red-200 rounded-2xl p-6 shadow-sm max-w-md text-center">
-          <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
-            <IcoAlert cls="h-6 w-6" />
+  return (
+    <div className="min-h-screen bg-slate-50/50 p-6 space-y-6 font-sans">
+      {/* EN-TÊTE PRINCIPAL */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/70">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Tour de Contrôle Atelier • Temps Réel
+            </span>
           </div>
-          <h3 className="text-lg font-bold text-slate-800 mb-1">Erreur de chargement</h3>
-          <p className="text-xs text-slate-500 mb-4">{error}</p>
-          <button
-            onClick={() => fetchDashboardData(false)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
-          >
-            Réessayer
-          </button>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
+            Supervision Direction
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Vision globale de l'atelier, statut des ponts et rendement des techniciens
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+            {today} — {now}
+          </span>
         </div>
       </div>
-    )
-  }
 
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <style>{`
-        @keyframes borderPulse {
-          0%,100% { border-color: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,.2); }
-          50%      { border-color: #fca5a5; box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-        }
-        .pont-retard { animation: borderPulse 2s ease-in-out infinite; }
-      `}</style>
+      {/* ERREUR EVENTUELLE */}
+      {error && (
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold">
+          ⚠️ {error}
+        </div>
+      )}
 
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        {/* En-tête */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* KPI & GRAPHIQUES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <OccupationDonut kpis={kpis} />
+        <ChargeBarChart chargeTravail={chargeTravail} />
+
+        {/* CARTE KPI SYNTHÈSE */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-              <span className="inline-block w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-              Tour de Contrôle — Atelier
-            </h1>
-            <p className="text-sm text-slate-400 mt-0.5 capitalize">{today}</p>
+            <h2 className="text-sm font-bold text-slate-700">Synthèse Journée</h2>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">Volumétrie globale des interventions du jour</p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-            <IcoClock cls="h-4 w-4 text-slate-400" />
-            <span className="text-sm font-bold text-slate-700 font-mono">{now}</span>
-            <span className="text-xs text-slate-400">• en direct</span>
+
+          <div className="grid grid-cols-2 gap-4 my-4">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+              <p className="text-xs font-semibold text-slate-400 uppercase">Aujourd'hui</p>
+              <p className="text-2xl font-black text-slate-800 mt-1">{kpis.total_aujourdhui}</p>
+            </div>
+
+            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+              <p className="text-xs font-semibold text-emerald-600 uppercase">Clôturées</p>
+              <p className="text-2xl font-black text-emerald-700 mt-1">{kpis.cloturees_aujourdhui}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+            <span>Ponts Libres : <strong className="text-slate-800">{kpis.ponts_libres}</strong></span>
+            <span>Ponts Occupés : <strong className="text-blue-600">{kpis.ponts_occupes}</strong></span>
           </div>
         </div>
+      </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              label: 'Ponts occupés',
-              value: `${kpis.ponts_occupes} / ${pontsList.length || 5}`,
-              sub: `${kpis.pourcentage_occupation}% d'occupation`,
-              color: 'blue',
-              icon: <IcoCar cls="h-5 w-5" />,
-            },
-            {
-              label: 'Ponts libres',
-              value: kpis.ponts_libres,
-              sub: 'disponibles maintenant',
-              color: 'emerald',
-              icon: <IcoCheck cls="h-5 w-5" />,
-            },
-            {
-              label: 'Interventions du jour',
-              value: kpis.interventions_du_jour,
-              sub: 'créées aujourd\'hui',
-              color: 'indigo',
-              icon: <IcoWrench cls="h-5 w-5" />,
-            },
-            {
-              label: 'Terminées aujourd\'hui',
-              value: kpis.terminees_aujourdhui,
-              sub: 'interventions clôturées',
-              color: 'emerald',
-              icon: <IcoCheck cls="h-5 w-5" />,
-            },
-          ].map(k => (
-            <div key={k.label} className={`bg-${k.color}-50 border border-${k.color}-200 rounded-2xl p-5 shadow-sm flex items-center gap-4`}>
-              <div className={`flex-shrink-0 w-10 h-10 rounded-xl bg-${k.color}-100 text-${k.color}-500 flex items-center justify-center`}>
-                {k.icon}
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-0.5">{k.label}</p>
-                <p className={`text-2xl font-black leading-none text-${k.color}-600`}>{k.value}</p>
-                <p className="text-xs text-slate-400 mt-1">{k.sub}</p>
-              </div>
-            </div>
+      {/* GRILLE DES PONTS (SUPERVISION ATELIER) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            Supervision des Ponts en Direct
+            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-extrabold">
+              {pontsList.length} Ponts
+            </span>
+          </h2>
+          <span className="text-xs text-slate-400">Actualisation temps réel Reverb</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          {pontsList.map((pont) => (
+            <PontCard key={pont.id} pont={pont} />
           ))}
         </div>
-
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <OccupationDonut kpis={kpis} />
-          <ChargeBarChart chargeTravail={chargeTravail} />
-        </div>
-
-        {/* Grille Ponts */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-slate-700">Supervision des {pontsList.length || 5} Ponts</h2>
-            <div className="hidden sm:flex items-center gap-4 text-xs text-slate-400">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block"/>En cours</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"/>Libre</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"/>En retard</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"/>Maintenance</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {pontsList.map(pont => (
-              <PontCard key={pont.id} pont={pont} />
-            ))}
-          </div>
-        </div>
-
       </div>
     </div>
   )

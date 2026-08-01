@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
   Bell, Play, CheckCircle2, AlertTriangle, Clock, Wrench,
-  ListTodo, TrendingUp, User, ShieldAlert, X, LogOut, RefreshCw, Calendar, PauseCircle
+  ListTodo, TrendingUp, User, ShieldAlert, X, LogOut, RefreshCw, Calendar, PauseCircle, ChevronRight
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import ConfirmModal from '../../components/ConfirmModal'
 import api from '../../api/axios'
+import echo from '../../echo'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -54,14 +55,18 @@ export default function TechnicienDashboardView() {
   const auth = useAuth()
   const currentUser = auth?.user
 
-  // États principaux
-  const [task, setTask] = useState(null)
+  // États principaux : Tableau de toutes les interventions attribuées au technicien
+  const [tasks, setTasks] = useState([])
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Chronomètre visuel pour intervention en cours
+  // Tâche active (index 0) et tâches suivantes dans la file
+  const activeTask = tasks[0] || null
+  const upcomingTasks = tasks.slice(1)
+
+  // Chronomètre visuel pour la tâche active 'En cours'
   const [seconds, setSeconds] = useState(0)
 
   // Navigation onglets mobile
@@ -69,22 +74,24 @@ export default function TechnicienDashboardView() {
   const [modalProblemOpen, setModalProblemOpen] = useState(false)
   const [customMotif, setCustomMotif] = useState('')
 
-  // 1. Récupération de l'intervention courante
+  // 1. Récupération de TOUTES les interventions du technicien en attente/en cours
   const fetchCurrentTask = async () => {
     try {
       setLoading(true)
       setError(null)
       const response = await api.get('/technicien/tache')
 
-      if (response.data && response.data.intervention) {
-        setTask(response.data.intervention)
+      if (response.data && Array.isArray(response.data.interventions)) {
+        setTasks(response.data.interventions)
+      } else if (response.data && response.data.intervention) {
+        setTasks([response.data.intervention])
       } else {
-        setTask(null)
+        setTasks([])
       }
     } catch (err) {
-      console.error('Erreur chargement tâche technicien:', err)
-      setError(err.response?.data?.message || 'Erreur lors de la récupération de votre tâche.')
-      setTask(null)
+      console.error('Erreur chargement tâches technicien:', err)
+      setError(err.response?.data?.message || 'Erreur lors de la récupération de vos tâches.')
+      setTasks([])
     } finally {
       setLoading(false)
     }
@@ -105,31 +112,75 @@ export default function TechnicienDashboardView() {
     }
   }
 
-  // Hook principal : Récupération initiale + Écoute WebSocket temps réel
+  // Hook principal : Récupération initiale + Écoute WebSocket temps réel sur 'atelier' et 'garage'
   useEffect(() => {
     fetchCurrentTask()
     fetchHistory()
 
-    if (window.Echo) {
-      const channel = window.Echo.channel('atelier')
+    const echoInstance = echo || window.Echo
+
+    if (echoInstance) {
+      const atelierChannel = echoInstance.channel('atelier')
+      const garageChannel = echoInstance.channel('garage')
 
       const handleWebSocketEvent = (e) => {
-        console.log('⚡ Événement temps réel reçu sur atelier:', e)
+        console.log('⚡ Événement temps réel reçu:', e)
         fetchCurrentTask()
         fetchHistory()
       }
 
-      channel.listen('.InterventionStatusChanged', handleWebSocketEvent)
-      channel.listen('InterventionStatusChanged', handleWebSocketEvent)
-      channel.listen('.App\\Events\\InterventionStatusChanged', handleWebSocketEvent)
+      const handleTicketCreated = (e) => {
+        console.log('⚡ Événement TicketCreated reçu sur garage:', e)
+        const assignedTechId = e?.technicien_id || e?.technicien?.id || e?.ticket?.technicien_id || e?.intervention?.user_id
+        // Si le ticket est attribué à ce technicien ou non-spécifié, on rafraîchit la liste des tâches
+        if (!assignedTechId || String(assignedTechId) === String(currentUser?.id)) {
+          fetchCurrentTask()
+          fetchHistory()
+        }
+      }
+
+      const handleTicketDeleted = (e) => {
+        console.log('⚡ Événement TicketDeleted reçu sur TechnicienDashboardView:', e)
+        const deletedId = e?.ticket_id || e?.id
+        if (deletedId) {
+          setTasks((prevTasks) => prevTasks.filter((t) => String(t.id) !== String(deletedId)))
+        }
+      }
+
+      atelierChannel.listen('.InterventionStatusChanged', handleWebSocketEvent)
+      atelierChannel.listen('InterventionStatusChanged', handleWebSocketEvent)
+      atelierChannel.listen('.intervention.updated', handleWebSocketEvent)
+      atelierChannel.listen('intervention.updated', handleWebSocketEvent)
+      atelierChannel.listen('.TicketDeleted', handleTicketDeleted)
+      atelierChannel.listen('TicketDeleted', handleTicketDeleted)
+
+      garageChannel.listen('.TicketCreated', handleTicketCreated)
+      garageChannel.listen('TicketCreated', handleTicketCreated)
+      garageChannel.listen('.TicketStatusUpdated', handleWebSocketEvent)
+      garageChannel.listen('TicketStatusUpdated', handleWebSocketEvent)
+      garageChannel.listen('.TicketDeleted', handleTicketDeleted)
+      garageChannel.listen('TicketDeleted', handleTicketDeleted)
 
       return () => {
-        channel.stopListening('.InterventionStatusChanged')
-        channel.stopListening('InterventionStatusChanged')
-        channel.stopListening('.App\\Events\\InterventionStatusChanged')
+        atelierChannel.stopListening('.InterventionStatusChanged')
+        atelierChannel.stopListening('InterventionStatusChanged')
+        atelierChannel.stopListening('.intervention.updated')
+        atelierChannel.stopListening('intervention.updated')
+        atelierChannel.stopListening('.TicketDeleted')
+        atelierChannel.stopListening('TicketDeleted')
+
+        garageChannel.stopListening('.TicketCreated')
+        garageChannel.stopListening('TicketCreated')
+        garageChannel.stopListening('.TicketStatusUpdated')
+        garageChannel.stopListening('TicketStatusUpdated')
+        garageChannel.stopListening('.TicketDeleted')
+        garageChannel.stopListening('TicketDeleted')
+
+        echoInstance.leaveChannel('atelier')
+        echoInstance.leaveChannel('garage')
       }
     }
-  }, [])
+  }, [currentUser?.id])
 
   // Charger l'historique au changement d'onglet vers 'bilan'
   useEffect(() => {
@@ -138,17 +189,21 @@ export default function TechnicienDashboardView() {
     }
   }, [activeTab])
 
-  // Chronomètre en continu pendant l'intervention active ('En cours')
+  // ⏱️ CHRONOMÈTRE RESISTANT A LA MISE EN VEILLE (SUR LA TÂCHE ACTIVE)
   useEffect(() => {
     let interval = null
-    if (task && task.statut === 'En cours') {
-      const initialSeconds = task.date_debut
-        ? Math.max(0, Math.floor((new Date() - new Date(task.date_debut)) / 1000))
-        : 0
-      setSeconds(initialSeconds)
+    if (activeTask && activeTask.statut === 'En cours') {
+      const calculateSeconds = () => {
+        if (!activeTask.date_debut) return 0
+        const startTime = new Date(activeTask.date_debut).getTime()
+        const now = Date.now()
+        return Math.max(0, Math.floor((now - startTime) / 1000))
+      }
+
+      setSeconds(calculateSeconds())
 
       interval = setInterval(() => {
-        setSeconds((prev) => prev + 1)
+        setSeconds(calculateSeconds())
       }, 1000)
     } else {
       setSeconds(0)
@@ -156,14 +211,14 @@ export default function TechnicienDashboardView() {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [task])
+  }, [activeTask])
 
-  // 3. Action API : Démarrer / Reprendre l'intervention
-  const handleStart = async () => {
-    if (!task) return
+  // 3. Action API : Démarrer / Reprendre l'intervention active
+  const handleStart = async (targetId = activeTask?.id) => {
+    if (!targetId) return
     try {
       setLoading(true)
-      await api.post(`/technicien/tache/${task.id}/start`)
+      await api.post(`/technicien/tache/${targetId}/start`)
       await fetchCurrentTask()
     } catch (err) {
       console.error('Erreur lors du démarrage:', err)
@@ -174,11 +229,11 @@ export default function TechnicienDashboardView() {
 
   // 4. Action API : Signaler un blocage (Statut 'Bloqué')
   const handleBlock = async (motif) => {
-    if (!task) return
+    if (!activeTask) return
     const finalMotif = motif || customMotif || 'Problème technique / En attente'
     try {
       setLoading(true)
-      await api.post(`/technicien/tache/${task.id}/block`, { motif: finalMotif })
+      await api.post(`/technicien/tache/${activeTask.id}/block`, { motif: finalMotif })
       setModalProblemOpen(false)
       setCustomMotif('')
       await fetchCurrentTask()
@@ -189,12 +244,12 @@ export default function TechnicienDashboardView() {
     }
   }
 
-  // 5. Action API : Terminer l'intervention
+  // 5. Action API : Terminer l'intervention active
   const handleFinish = async () => {
-    if (!task) return
+    if (!activeTask) return
     try {
       setLoading(true)
-      await api.post(`/technicien/tache/${task.id}/finish`)
+      await api.post(`/technicien/tache/${activeTask.id}/finish`)
       await fetchCurrentTask()
       await fetchHistory()
     } catch (err) {
@@ -223,10 +278,10 @@ export default function TechnicienDashboardView() {
 
   // Nom et pont du technicien connecté
   const technicienNom = currentUser?.name || 'Technicien'
-  const pontNom = task?.pont?.nom || (currentUser?.pont_id ? `Pont ${currentUser.pont_id}` : 'Atelier')
+  const pontNom = activeTask?.pont?.nom || (currentUser?.pont_id ? `Pont ${currentUser.pont_id}` : 'Atelier')
 
   // UI : Indicateur de chargement initial
-  if (loading && !task) {
+  if (loading && tasks.length === 0) {
     return (
       <div className="w-full max-w-md mx-auto h-screen flex flex-col items-center justify-center bg-slate-100 p-6 font-sans">
         <div className="flex flex-col items-center gap-4 text-center">
@@ -262,17 +317,16 @@ export default function TechnicienDashboardView() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Badge statut connexion temps réel */}
-          <div className="flex items-center gap-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-full text-xs font-extrabold">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>En direct</span>
-          </div>
+          {/* Badge du nombre total de véhicules attribués */}
+          <span className="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-sm">
+            {tasks.length} {tasks.length > 1 ? 'véhicules' : 'véhicule'}
+          </span>
 
           {/* Déconnexion */}
           <button
             onClick={handleLogout}
             title="Se déconnecter"
-            className="text-slate-400 hover:text-rose-400 p-1.5 transition rounded-lg hover:bg-slate-800 cursor-pointer"
+            className="text-slate-400 hover:text-rose-400 p-1.5 transition rounded-lg hover:bg-slate-800 cursor-pointer ml-1"
           >
             <LogOut className="w-5 h-5" />
           </button>
@@ -282,11 +336,11 @@ export default function TechnicienDashboardView() {
       {/* ─────────────────────────────────────────────────────────────
           2. ZONE CENTRALE (Scrollable)
       ───────────────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col justify-start">
+      <main className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col justify-start gap-5">
 
         {/* ERREUR EVENTUELLE */}
         {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
             <span>{error}</span>
           </div>
@@ -296,7 +350,7 @@ export default function TechnicienDashboardView() {
         {activeTab === 'queue' && (
           <>
             {/* SI AUCUNE TÂCHE ASSIGNÉE */}
-            {!task ? (
+            {!activeTask ? (
               <div className="my-auto bg-white rounded-3xl p-8 text-center border border-slate-200 shadow-sm space-y-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
                   <CheckCircle2 className="w-10 h-10" />
@@ -318,141 +372,196 @@ export default function TechnicienDashboardView() {
               </div>
             ) : (
 
-              /* INTERVENTION DÉTECTÉE */
+              /* SECTION 1 : TÂCHE ACTUELLE (activeTask) */
               <div className="flex flex-col gap-4">
-
-                {/* Badge Statut (En attente / En cours / Bloqué) */}
                 <div className="flex items-center justify-between">
-                  <span className={`inline-flex items-center gap-2 border px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider shadow-sm ${
-                    task.statut === 'En cours'
-                      ? 'bg-blue-100 text-blue-700 border-blue-200'
-                      : task.statut === 'Bloqué'
-                      ? 'bg-red-100 text-red-700 border-red-200'
-                      : 'bg-amber-100 text-amber-800 border-amber-200'
-                  }`}>
-                    <span className={`w-2.5 h-2.5 rounded-full ${
-                      task.statut === 'En cours'
-                        ? 'bg-blue-600 animate-ping'
-                        : task.statut === 'Bloqué'
-                        ? 'bg-red-600 animate-pulse'
-                        : 'bg-amber-500'
-                    }`} />
-                    {task.statut === 'En cours'
-                      ? 'Intervention en cours'
-                      : task.statut === 'Bloqué'
-                      ? 'Intervention bloquée'
-                      : 'Intervention en attente'}
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                    Tâche Actuelle à Traiter
                   </span>
-
-                  <span className="text-xs font-mono font-bold text-slate-500">
-                    {task.pont?.nom || 'Pont'}
+                  <span className="text-xs font-mono font-bold text-slate-400">
+                    1 / {tasks.length}
                   </span>
                 </div>
 
-                {/* Plaque d'immatriculation GRAND FORMAT */}
-                <LicensePlate immat={task.vehicule?.matricule} size="large" />
+                {/* Carte de la tâche principale */}
+                <div className="bg-white rounded-3xl p-5 border-2 border-blue-500/30 shadow-md space-y-4">
+                  {/* Badge Statut */}
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex items-center gap-2 border px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider shadow-xs ${
+                      activeTask.statut === 'En cours'
+                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                        : activeTask.statut === 'Bloqué'
+                        ? 'bg-red-100 text-red-700 border-red-200'
+                        : 'bg-amber-100 text-amber-800 border-amber-200'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        activeTask.statut === 'En cours'
+                          ? 'bg-blue-600 animate-ping'
+                          : activeTask.statut === 'Bloqué'
+                          ? 'bg-red-600 animate-pulse'
+                          : 'bg-amber-500'
+                      }`} />
+                      {activeTask.statut === 'En cours'
+                        ? 'En cours'
+                        : activeTask.statut === 'Bloqué'
+                        ? 'Bloqué'
+                        : 'En attente'}
+                    </span>
 
-                {/* Détails du véhicule & intervention */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
-                  <div>
+                    <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      {activeTask.pont?.nom || 'Pont'}
+                    </span>
+                  </div>
+
+                  {/* Plaque d'immatriculation GRAND FORMAT */}
+                  <LicensePlate immat={activeTask.vehicule?.matricule} size="large" />
+
+                  {/* Détails du véhicule & intervention */}
+                  <div className="space-y-2 pt-1">
                     <h2 className="text-xl font-black text-slate-800">
-                      {task.vehicule ? `${task.vehicule.marque} ${task.vehicule.modele}` : 'Véhicule'}
+                      {activeTask.vehicule ? `${activeTask.vehicule.marque} ${activeTask.vehicule.modele}` : 'Véhicule'}
                     </h2>
-                    <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                      Pont d'affectation : {task.pont?.nom || 'Non défini'}
-                    </p>
-                  </div>
 
-                  <div className="flex items-start gap-2.5 text-sm font-bold text-slate-700 pt-3 border-t border-slate-100">
-                    <Wrench className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <span>{task.type_intervention}</span>
-                  </div>
+                    <div className="flex items-start gap-2 text-xs font-bold text-slate-700 pt-2 border-t border-slate-100">
+                      <Wrench className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span>{activeTask.type_intervention}</span>
+                    </div>
 
-                  {/* ALERTE BLOCAGE SI STATUT BLOQUÉ */}
-                  {task.statut === 'Bloqué' && (
-                    <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-bold space-y-1 mt-2">
-                      <div className="flex items-center gap-1.5 text-red-700">
-                        <ShieldAlert className="w-4 h-4 shrink-0 text-red-600" />
-                        <span className="uppercase tracking-wider">Motif du blocage :</span>
+                    {/* ALERTE BLOCAGE SI STATUT BLOQUÉ */}
+                    {activeTask.statut === 'Bloqué' && (
+                      <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-bold space-y-1 mt-2">
+                        <div className="flex items-center gap-1.5 text-red-700">
+                          <ShieldAlert className="w-4 h-4 shrink-0 text-red-600" />
+                          <span className="uppercase tracking-wider">Motif du blocage :</span>
+                        </div>
+                        <p className="text-slate-800 font-semibold pl-5">
+                          {activeTask.motif_blocage || 'En attente de pièces / validation'}
+                        </p>
                       </div>
-                      <p className="text-slate-800 font-semibold pl-5">
-                        {task.motif_blocage || 'En attente de pièces / validation'}
+                    )}
+                  </div>
+
+                  {/* Chronomètre visuel si 'En cours' */}
+                  {activeTask.statut === 'En cours' && (
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-center">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center justify-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-blue-500" /> Temps d'intervention
                       </p>
+                      <div className="text-4xl font-extrabold font-mono text-slate-800 tracking-wider">
+                        {formatChrono(seconds)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LOGIQUE DES BOUTONS */}
+                  {activeTask.statut === 'En attente' && (
+                    <button
+                      onClick={() => handleStart(activeTask.id)}
+                      disabled={loading}
+                      className="w-full h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Play className="w-5 h-5 fill-current" />
+                      <span>Démarrer l'intervention</span>
+                    </button>
+                  )}
+
+                  {activeTask.statut === 'En cours' && (
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        onClick={handleFinish}
+                        disabled={loading}
+                        className="w-full h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>Terminer l'intervention</span>
+                      </button>
+
+                      <button
+                        onClick={() => setModalProblemOpen(true)}
+                        className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <PauseCircle className="w-4 h-4 text-red-500" />
+                        <span>Signaler un blocage</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {activeTask.statut === 'Bloqué' && (
+                    <div className="flex flex-col gap-2 pt-1">
+                      <button
+                        onClick={() => handleStart(activeTask.id)}
+                        disabled={loading}
+                        className="w-full h-14 text-base font-black bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                        <span>Reprendre l'intervention</span>
+                      </button>
+
+                      <button
+                        onClick={handleFinish}
+                        disabled={loading}
+                        className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Terminer l'intervention</span>
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Chronomètre visuel si 'En cours' */}
-                {task.statut === 'En cours' && (
-                  <div className="bg-white rounded-2xl p-5 border-2 border-slate-200 shadow-inner text-center my-1">
-                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center justify-center gap-1.5">
-                      <Clock className="w-4 h-4 text-blue-500" /> Temps d'intervention
-                    </p>
-                    <div className="text-5xl font-extrabold font-mono text-slate-800 tracking-wider">
-                      {formatChrono(seconds)}
+                {/* SECTION 2 : PROCHAINES INTERVENTIONS EN ATTENTE (upcomingTasks) */}
+                {upcomingTasks.length > 0 && (
+                  <div className="space-y-3 pt-4 border-t border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-slate-500" />
+                        Prochaines Interventions en Attente
+                      </h3>
+                      <span className="bg-slate-200 text-slate-700 font-extrabold text-[11px] px-2 py-0.5 rounded-full">
+                        {upcomingTasks.length}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {upcomingTasks.map((t, idx) => {
+                        const nextOrderNum = idx + 2
+                        return (
+                          <div
+                            key={t.id}
+                            className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs flex items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 font-bold text-xs flex items-center justify-center shrink-0">
+                                #{nextOrderNum}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="font-mono font-bold text-slate-900 text-xs tracking-wider">
+                                  {t.vehicule?.matricule || 'SANS-IMMAT'}
+                                </p>
+                                <p className="text-xs font-bold text-slate-700 truncate leading-tight mt-0.5">
+                                  {t.vehicule ? `${t.vehicule.marque} ${t.vehicule.modele}` : 'Véhicule'}
+                                </p>
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                  {t.type_intervention}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-end shrink-0 gap-1">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                                En attente
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                Arrivée {t.heure || 'récente'}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}
-
-                {/* LOGIQUE DES BOUTONS */}
-
-                {/* A. Si statut === 'En attente' -> DÉMARRER */}
-                {task.statut === 'En attente' && (
-                  <button
-                    onClick={handleStart}
-                    disabled={loading}
-                    className="w-full h-16 text-lg font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-3 transition-all cursor-pointer"
-                  >
-                    <Play className="w-6 h-6 fill-current" />
-                    <span>Démarrer l'intervention</span>
-                  </button>
-                )}
-
-                {/* B. Si statut === 'En cours' -> TERMINER + SIGNALER UN BLOCAGE */}
-                {task.statut === 'En cours' && (
-                  <>
-                    <button
-                      onClick={handleFinish}
-                      disabled={loading}
-                      className="w-full h-16 text-lg font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-3 transition-all cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-6 h-6" />
-                      <span>Terminer l'intervention</span>
-                    </button>
-
-                    <button
-                      onClick={() => setModalProblemOpen(true)}
-                      className="w-full h-12 bg-red-50 hover:bg-red-100 active:scale-[0.98] text-red-600 font-bold text-sm rounded-xl border border-red-200 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      <PauseCircle className="w-4 h-4 text-red-500" />
-                      <span>Signaler un blocage</span>
-                    </button>
-                  </>
-                )}
-
-                {/* C. Si statut === 'Bloqué' -> REPRENDRE L'INTERVENTION / TERMINER */}
-                {task.statut === 'Bloqué' && (
-                  <>
-                    <button
-                      onClick={handleStart}
-                      disabled={loading}
-                      className="w-full h-16 text-lg font-black bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-3 transition-all cursor-pointer"
-                    >
-                      <Play className="w-6 h-6 fill-current" />
-                      <span>Reprendre l'intervention</span>
-                    </button>
-
-                    <button
-                      onClick={handleFinish}
-                      disabled={loading}
-                      className="w-full h-12 bg-emerald-50 hover:bg-emerald-100 active:scale-[0.98] text-emerald-700 font-bold text-sm rounded-xl border border-emerald-200 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>Terminer l'intervention</span>
-                    </button>
-                  </>
-                )}
-
               </div>
             )}
           </>
@@ -480,9 +589,9 @@ export default function TechnicienDashboardView() {
                 <p className="text-2xl font-black text-emerald-600 mt-1">{history.length}</p>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center">
-                <p className="text-xs font-semibold text-slate-400 uppercase">Tâche Actuelle</p>
-                <p className="text-sm font-extrabold text-blue-600 mt-1.5 truncate">
-                  {task ? task.statut : 'Aucune'}
+                <p className="text-xs font-semibold text-slate-400 uppercase">En Attente / Cours</p>
+                <p className="text-2xl font-black text-blue-600 mt-1">
+                  {tasks.length}
                 </p>
               </div>
             </div>
@@ -607,7 +716,7 @@ export default function TechnicienDashboardView() {
           }`}
         >
           <ListTodo className="w-6 h-6" />
-          <span className="text-[10px] leading-none">Tâche Active</span>
+          <span className="text-[10px] leading-none">Tâches ({tasks.length})</span>
         </button>
 
         <button
@@ -653,7 +762,7 @@ export default function TechnicienDashboardView() {
 
             <p className="text-xs text-slate-500">
               Sélectionnez ou saisissez le motif du blocage pour la plaque{' '}
-              <strong className="text-slate-800 font-mono">{task?.vehicule?.matricule}</strong> :
+              <strong className="text-slate-800 font-mono">{activeTask?.vehicule?.matricule}</strong> :
             </p>
 
             <div className="flex flex-col gap-2">

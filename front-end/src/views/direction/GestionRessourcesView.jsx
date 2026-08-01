@@ -583,7 +583,10 @@ export default function GestionRessourcesView() {
   const nbPresents    = techniciens.filter(t => t.actif && t.statutJour === 'Présent').length
   const nbAbsents     = techniciens.filter(t => t.actif && t.statutJour === 'Absent').length
   const nbConge       = techniciens.filter(t => t.actif && t.statutJour === 'En congé').length
-  const nbMaintenance = ponts.filter(p => p.statut === 'En maintenance').length
+  const nbMaintenance = ponts.filter(p => {
+    const st = String(p.statut || '').toLowerCase()
+    return st.includes('maint') || st.includes('hors')
+  }).length
 
   if (loading && techniciens.length === 0) {
     return (

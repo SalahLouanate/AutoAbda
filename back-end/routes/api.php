@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReceptionController;
 use App\Http\Controllers\Api\RessourceController;
 use App\Http\Controllers\Api\TechnicienController;
+use App\Http\Controllers\Api\SettingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/user', [ProfileController::class, 'show']);
     Route::put('/user/profile', [ProfileController::class, 'updateProfile']);
     Route::put('/user/password', [ProfileController::class, 'updatePassword']);
+
+    // Settings / Paramètres de l'Atelier
+    Route::get('/settings/auto-closing-time', [SettingController::class, 'getAutoClosingTime']);
+    Route::put('/settings/auto-closing-time', [SettingController::class, 'updateAutoClosingTime']);
+    Route::get('/settings', [SettingController::class, 'getAutoClosingTime']);
+    Route::put('/settings', [SettingController::class, 'updateAutoClosingTime']);
 
     // Routes Dashboard & Direction
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
@@ -55,8 +62,18 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/technicien/historique', [TechnicienController::class, 'getHistory']);
 
     // Routes Module Réception
+    Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);
+    Route::delete('/tickets/{id}', [ReceptionController::class, 'destroyTicket']);
     Route::prefix('reception')->group(function () {
+        Route::get('/catalogue', [ReceptionController::class, 'getInterventions']);
         Route::get('/interventions', [ReceptionController::class, 'getInterventions']);
+        Route::get('/tickets', [ReceptionController::class, 'getTickets']);
+        Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);
+        Route::get('/file-attente', [ReceptionController::class, 'getFileAttente']);
+        Route::get('/historique', [ReceptionController::class, 'getHistorique']);
+        Route::get('/techniciens-disponibles', [ReceptionController::class, 'getTechniciensDisponibles']);
         Route::post('/tickets', [ReceptionController::class, 'storeTicket']);
+        Route::delete('/tickets/{id}', [ReceptionController::class, 'destroyTicket']);
+        Route::delete('/interventions/{id}', [ReceptionController::class, 'destroyTicket']);
     });
 });

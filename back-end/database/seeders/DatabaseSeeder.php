@@ -71,6 +71,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call([
+            SettingSeeder::class,
             PrestationSeeder::class,
             InterventionSeeder::class,
         ]);

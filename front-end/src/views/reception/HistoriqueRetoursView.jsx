@@ -1,73 +1,23 @@
-import { useState, useMemo } from "react";
-
-// ─────────────────────────────────────────────
-// MOCK DATA
-// ─────────────────────────────────────────────
-const MOCK_VEHICLES = [
-  {
-    id: "v1",
-    immatriculation: "1234-A-50",
-    marque: "Renault",
-    modele: "Express",
-    annee: 2021,
-    tickets: [
-      {
-        id: "T-001",
-        type: "Remplacement lève-vitre (système standard)",
-        date: "2026-01-10",
-        technicien: "Meraouni Mustapha",
-        statut: "Clôturé",
-      },
-      {
-        id: "T-002",
-        type: "Vidange complète",
-        date: "2026-05-15",
-        technicien: "Yassir Zimi",
-        statut: "Clôturé",
-      },
-    ],
-  },
-  {
-    id: "v2",
-    immatriculation: "IJ-789-KL",
-    marque: "Dacia",
-    modele: "Sandero",
-    annee: null,
-    tickets: [
-      {
-        id: "T-003",
-        type: "Diagnostic moteur",
-        date: "2026-06-20",
-        technicien: "Yassir Zimi",
-        statut: "Clôturé",
-      },
-    ],
-  },
-];
+import { useState, useEffect } from 'react'
+import api from '../../api/axios'
 
 // ─────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────
 const MOIS_LABELS = [
-  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
-];
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+]
 
 function formatDate(isoDate) {
-  if (!isoDate) return "—";
-  const [year, month, day] = isoDate.split("-");
-  return `${day}/${month}/${year}`;
+  if (!isoDate) return '—'
+  const d = new Date(isoDate)
+  if (isNaN(d.getTime())) return isoDate
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function getAllYears(vehicles) {
-  const years = new Set();
-  vehicles.forEach((v) =>
-    v.tickets.forEach((t) => {
-      if (t.date) years.add(t.date.split("-")[0]);
-    })
-  );
-  return [...years].sort((a, b) => b - a);
-}
+const CURRENT_YEAR = new Date().getFullYear()
+const YEARS_OPTIONS = Array.from({ length: 5 }, (_, i) => String(CURRENT_YEAR - i))
 
 // ─────────────────────────────────────────────
 // ICONS (inline SVG)
@@ -77,427 +27,370 @@ function ArrowLeftIcon() {
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
     </svg>
-  );
+  )
 }
 
-function CarIcon({ className = "h-8 w-8" }) {
+function CarIcon({ className = 'h-8 w-8' }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M8 17h8M3 11l2-5h14l2 5M3 11h18v6H3v-6zm3 6v1a1 1 0 002 0v-1m8 0v1a1 1 0 002 0v-1" />
     </svg>
-  );
+  )
 }
 
-function WrenchIcon({ className = "h-4 w-4" }) {
+function WrenchIcon({ className = 'h-4 w-4' }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09.542-.56 1.007-1.05.77A7 7 0 1018.5 12.5c0-.282-.02-.56-.057-.832-.04-.3.228-.598.527-.558a4.5 4.5 0 01-6.627-4.17z" />
     </svg>
-  );
+  )
 }
 
-function UserIcon({ className = "h-4 w-4" }) {
+function UserIcon({ className = 'h-4 w-4' }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
-  );
-}
-
-function CalendarIcon({ className = "h-4 w-4" }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-    </svg>
-  );
-}
-
-function TicketIcon({ className = "h-4 w-4" }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a3 3 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon({ className = "h-5 w-5" }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-    </svg>
-  );
+  )
 }
 
 function SearchIcon() {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803a7.5 7.5 0 0010.607 5.197z" />
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
-  );
+  )
+}
+
+function TicketIcon({ className = 'h-5 w-5' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75M6 6v.75m0 3v.75m0 3v.75M3.75 6H15a2.25 2.25 0 012.25 2.25v7.5A2.25 2.25 0 0115 18H3.75A2.25 2.25 0 011.5 15.75v-7.5A2.25 2.25 0 013.75 6z" />
+    </svg>
+  )
 }
 
 function AlertIcon() {
   return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
-  );
+  )
 }
 
 // ─────────────────────────────────────────────
-// VEHICLE CARD (Master)
+// COMPOSANT CARTE VÉHICULE (Pleine Largeur w-full)
 // ─────────────────────────────────────────────
 function VehicleCard({ vehicle, onClick }) {
-  const nbTickets = vehicle.tickets.length;
-  return (
-    <button
-      onClick={() => onClick(vehicle)}
-      className="group w-full text-left bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-400 hover:-translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
-    >
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 flex items-center justify-center w-14 h-14 rounded-xl bg-blue-50 text-blue-500 group-hover:bg-blue-100 transition-colors duration-200">
-          <CarIcon className="h-8 w-8" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-0.5">
-            {vehicle.immatriculation}
-          </p>
-          <h3 className="text-base font-bold text-slate-800 truncate">
-            {vehicle.marque} {vehicle.modele}{" "}
-            {vehicle.annee && <span className="font-normal text-slate-500">{vehicle.annee}</span>}
-          </h3>
-          <p className="mt-2 text-xs text-slate-400">
-            {nbTickets} intervention{nbTickets > 1 ? "s" : ""} enregistrée{nbTickets > 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex-shrink-0 self-center text-slate-300 group-hover:text-blue-400 group-hover:translate-x-1 transition-all duration-200">
-          <ChevronRightIcon />
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// ─────────────────────────────────────────────
-// TICKET ROW (Detail)
-// ─────────────────────────────────────────────
-function TicketRow({ ticket, onClick }) {
-  return (
-    <button
-      onClick={() => onClick(ticket)}
-      className="group w-full text-left bg-white border border-slate-200 rounded-xl px-5 py-4 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
-    >
-      <div className="flex items-center gap-4">
-        <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors duration-200">
-          <TicketIcon className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-800 truncate">{ticket.type}</p>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <span className="flex items-center gap-1 text-xs text-slate-400">
-              <CalendarIcon /> {formatDate(ticket.date)}
-            </span>
-            <span className="flex items-center gap-1 text-xs text-slate-400">
-              <UserIcon /> {ticket.technicien}
-            </span>
-          </div>
-        </div>
-        <span className="flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 hidden sm:inline-flex">
-          {ticket.statut}
-        </span>
-        <span className="flex-shrink-0 text-xs text-slate-300 font-mono hidden md:block">
-          #{ticket.id}
-        </span>
-        <div className="flex-shrink-0 text-slate-300 group-hover:text-blue-400 group-hover:translate-x-1 transition-all duration-200">
-          <ChevronRightIcon className="h-4 w-4" />
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// ─────────────────────────────────────────────
-// INFO BLOCK (used inside modal)
-// ─────────────────────────────────────────────
-function InfoBlock({ icon, label, value, fullWidth = false }) {
-  return (
-    <div className={`flex flex-col gap-1 p-3 bg-slate-50 rounded-lg border border-slate-100 ${fullWidth ? "col-span-2" : ""}`}>
-      <div className="flex items-center gap-1.5 text-slate-400">
-        {icon}
-        <span className="text-xs uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-sm font-semibold text-slate-700 leading-snug">{value}</p>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-// MODALE Détail Ticket + SAV
-// ─────────────────────────────────────────────
-function TicketModal({ ticket, vehicle, onClose, onDeclarer }) {
-  if (!ticket || !vehicle) return null;
+  const count = vehicle.tickets_count ?? vehicle.interventions_count ?? 0
+  const immat = vehicle.immatriculation || vehicle.matricule || 'SANS-IMMAT'
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
-      onClick={onClose}
+      onClick={() => onClick(vehicle)}
+      className="w-full flex items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all gap-5 cursor-pointer group"
     >
+      {/* Plaque à gauche avec flex-shrink-0 */}
+      <div className="flex-shrink-0 bg-white border-2 border-gray-800 text-gray-900 font-mono font-bold text-sm px-3 py-1.5 rounded-md whitespace-nowrap shadow-xs">
+        {immat}
+      </div>
+
+      {/* Infos au centre avec flex-1 */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <h3 className="text-lg font-bold text-gray-800 truncate leading-tight">
+          {vehicle.marque}
+        </h3>
+        <p className="text-sm text-gray-500 mt-1">
+          {count} intervention{count > 1 ? 's' : ''} enregistrée{count > 1 ? 's' : ''}
+        </p>
+      </div>
+
+      {/* Flèche à droite */}
+      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// COMPOSANT LIGNE D'INTERVENTION
+// ─────────────────────────────────────────────
+function TicketRow({ ticket, onClick }) {
+  const statut = ticket.statut || 'Terminé'
+
+  let badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (statut === 'En cours') {
+    badgeColor = 'bg-blue-50 text-blue-700 border-blue-200'
+  } else if (statut === 'Bloqué') {
+    badgeColor = 'bg-rose-50 text-rose-700 border-rose-200'
+  } else if (statut === 'En attente') {
+    badgeColor = 'bg-amber-50 text-amber-700 border-amber-200'
+  }
+
+  return (
+    <div
+      onClick={() => onClick(ticket)}
+      className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow mb-3 cursor-pointer"
+    >
+      <div className="flex items-center min-w-0">
+        <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+          <WrenchIcon className="h-5 w-5" />
+        </div>
+        <div className="flex flex-col ml-4 min-w-0">
+          <h4 className="text-md font-semibold text-gray-800 truncate">
+            {ticket.type_intervention || ticket.type}
+          </h4>
+          <p className="text-sm text-gray-500 mt-0.5 truncate">
+            Technicien : {ticket.technicien || 'Non assigné'}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 flex-shrink-0">
+        <span className="text-sm text-gray-400 font-mono">
+          {formatDate(ticket.created_at || ticket.date)}
+        </span>
+        <span className={`px-3 py-1 text-xs font-medium rounded-full border ${badgeColor}`}>
+          {statut}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function InfoBlock({ icon, label, value, fullWidth }) {
+  return (
+    <div className={`p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center gap-3 ${fullWidth ? 'col-span-2' : ''}`}>
+      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+        <p className="text-xs font-bold text-slate-800 truncate mt-0.5">{value || '—'}</p>
+      </div>
+    </div>
+  )
+}
+
+function TicketModal({ ticket, vehicle, onClose, onDeclarer }) {
+  if (!ticket) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4" onClick={onClose}>
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in"
-        style={{ animation: "modalIn 0.2s ease-out" }}
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-5 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-blue-200 uppercase tracking-widest">
-              Détail de l'intervention
-            </p>
-            <h2 className="text-lg font-bold text-white mt-0.5">Ticket #{ticket.id}</h2>
+        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <TicketIcon className="text-yellow-400" />
+            <h3 className="font-bold text-sm">Détail Intervention #{ticket.id}</h3>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Fermer la modale"
-            className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-blue-700/50 transition-colors"
-          >
-            <XIcon />
-          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition">✕</button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-4">
-          {/* Véhicule */}
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-            <div className="text-slate-400"><CarIcon className="h-6 w-6" /></div>
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide">Véhicule</p>
-              <p className="text-sm font-semibold text-slate-700">
-                {vehicle.marque} {vehicle.modele} {vehicle.annee || ""}
-                {" — "}
-                <span className="text-blue-600">{vehicle.immatriculation}</span>
-              </p>
-            </div>
+        <div className="p-6 space-y-4">
+          <div className="bg-white border-2 border-gray-800 text-gray-900 font-mono font-bold py-2.5 px-4 rounded-xl text-center text-lg tracking-widest">
+            {vehicle?.immatriculation || vehicle?.matricule}
           </div>
 
-          {/* Grille infos */}
-          <div className="grid grid-cols-2 gap-3">
-            <InfoBlock
-              icon={<TicketIcon className="h-4 w-4" />}
-              label="N° Ticket"
-              value={`#${ticket.id}`}
-            />
-            <InfoBlock
-              icon={<CalendarIcon className="h-4 w-4" />}
-              label="Date de clôture"
-              value={formatDate(ticket.date)}
-            />
-            <InfoBlock
-              icon={<WrenchIcon className="h-4 w-4" />}
-              label="Type d'intervention"
-              value={ticket.type}
-              fullWidth
-            />
-            <InfoBlock
-              icon={<UserIcon className="h-4 w-4" />}
-              label="Technicien"
-              value={ticket.technicien}
-            />
-            <InfoBlock
-              icon={<span className="inline-block w-2 h-2 rounded-full bg-emerald-400 mt-0.5" />}
-              label="Statut"
-              value={ticket.statut}
-            />
+          <div className="grid grid-cols-2 gap-2.5">
+            <InfoBlock icon={<CarIcon className="h-4 w-4" />} label="Véhicule" value={vehicle?.marque} />
+            <InfoBlock icon={<TicketIcon className="h-4 w-4" />} label="Date" value={formatDate(ticket.created_at || ticket.date)} />
+            <InfoBlock icon={<WrenchIcon className="h-4 w-4" />} label="Prestation" value={ticket.type_intervention || ticket.type} fullWidth />
+            <InfoBlock icon={<UserIcon className="h-4 w-4" />} label="Technicien" value={ticket.technicien} />
+            <InfoBlock icon={<span className="w-2 h-2 rounded-full bg-emerald-500" />} label="Statut" value={ticket.statut || 'Clôturé'} />
           </div>
         </div>
 
-        {/* Footer actions */}
-        <div className="px-6 pb-6 flex flex-col sm:flex-row gap-3">
+        <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={onDeclarer}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 active:scale-95 text-white font-bold py-3 px-5 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+            className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer"
           >
             <AlertIcon />
-            Déclarer un Retour SAV
+            <span>Déclarer un Retour SAV</span>
           </button>
-          <button
-            onClick={onClose}
-            className="flex-shrink-0 py-3 px-5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 active:scale-95 transition-all duration-200"
-          >
+          <button onClick={onClose} className="py-3 px-4 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-200 transition cursor-pointer">
             Fermer
           </button>
         </div>
       </div>
-
-      {/* Keyframe pour l'animation d'ouverture */}
-      <style>{`
-        @keyframes modalIn {
-          from { opacity: 0; transform: scale(0.96) translateY(8px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
     </div>
-  );
+  )
 }
 
 // ─────────────────────────────────────────────
 // COMPOSANT PRINCIPAL
 // ─────────────────────────────────────────────
 export default function HistoriqueRetoursView() {
-  const [searchQuery, setSearchQuery]     = useState("");
-  const [filters, setFilters]             = useState({ jour: "", mois: "", annee: "" });
-  const [selectedVehicle, setSelectedVehicle] = useState(null);
-  const [selectedTicket, setSelectedTicket]   = useState(null);
+  const [searchQuery, setSearchQuery] = useState('')
+  const [day, setDay]                 = useState('')
+  const [month, setMonth]             = useState('')
+  const [year, setYear]               = useState('')
+  const [results, setResults]         = useState([])
+  const [loading, setLoading]         = useState(false)
 
-  const allYears = useMemo(() => getAllYears(MOCK_VEHICLES), []);
+  const [selectedVehicle, setSelectedVehicle] = useState(null)
+  const [selectedTicket, setSelectedTicket]   = useState(null)
 
-  // Filtrage Master : par plaque
-  const filteredVehicles = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return MOCK_VEHICLES;
-    return MOCK_VEHICLES.filter((v) =>
-      v.immatriculation.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
+  useEffect(() => {
+    setLoading(true)
 
-  // Filtrage Detail : tickets du véhicule sélectionné + filtres date
-  const filteredTickets = useMemo(() => {
-    if (!selectedVehicle) return [];
-    return selectedVehicle.tickets.filter((t) => {
-      if (!t.date) return true;
-      const [year, month, day] = t.date.split("-");
-      if (filters.annee && year !== filters.annee) return false;
-      if (filters.mois  && month !== filters.mois.padStart(2, "0")) return false;
-      if (filters.jour  && day   !== filters.jour.padStart(2, "0")) return false;
-      return true;
-    });
-  }, [selectedVehicle, filters]);
+    const handler = setTimeout(async () => {
+      try {
+        const response = await api.get('/reception/historique', {
+          params: {
+            plaque: searchQuery.trim(),
+            jour: day,
+            mois: month,
+            annee: year,
+          },
+        })
+
+        if (response.data && Array.isArray(response.data.vehicules)) {
+          setResults(response.data.vehicules)
+        } else {
+          setResults([])
+        }
+      } catch (err) {
+        console.error('Erreur lors de la recherche historique:', err)
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    }, 500)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [searchQuery, day, month, year])
 
   const handleVehicleClick = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    setSelectedTicket(null);
-    setFilters({ jour: "", mois: "", annee: "" });
-  };
+    setSelectedVehicle(vehicle)
+    setSelectedTicket(null)
+  }
 
   const handleBack = () => {
-    setSelectedVehicle(null);
-    setSelectedTicket(null);
-  };
+    setSelectedVehicle(null)
+    setSelectedTicket(null)
+  }
 
   const handleDeclarer = () => {
-    alert(`✅ Retour SAV déclaré pour le ticket #${selectedTicket.id}`);
-    setSelectedTicket(null);
-  };
+    alert(`✅ Retour SAV déclaré avec succès pour le ticket #${selectedTicket?.id}`)
+    setSelectedTicket(null)
+  }
 
-  const totalTickets = MOCK_VEHICLES.reduce((acc, v) => acc + v.tickets.length, 0);
+  const totalInterventionsCount = selectedVehicle?.tickets_count ?? selectedVehicle?.interventions_count ?? selectedVehicle?.interventions?.length ?? 0
+  const immatSelected = selectedVehicle?.immatriculation || selectedVehicle?.matricule || 'SANS-IMMAT'
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <div className="min-h-screen bg-slate-50/50 p-6 space-y-6 font-sans">
+      <div className="max-w-4xl mx-auto space-y-6">
 
         {/* ── PAGE HEADER ── */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">
-              Historique des Retours
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+              Historique des Véhicules &amp; SAV
             </h1>
-            <p className="text-sm text-slate-400 mt-0.5">
-              Consultez et gérez les interventions passées par véhicule.
+            <p className="text-xs text-slate-500 mt-1">
+              Consultez l'historique des interventions passées et filtrez par immatriculation ou période.
             </p>
           </div>
-          <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-            {totalTickets} ticket{totalTickets > 1 ? "s" : ""} au total
+          <span className="text-xs font-extrabold px-3.5 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            {results.length} véhicule{results.length > 1 ? 's' : ''} trouvé{results.length > 1 ? 's' : ''}
           </span>
         </div>
 
         {/* ── TOP BAR : Recherche + Filtres ── */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Barre de recherche */}
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-              <SearchIcon />
+        {!selectedVehicle && (
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
+                <SearchIcon />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher une plaque d'immatriculation..."
+                className="w-full pl-10 pr-4 py-3 text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 placeholder:font-normal shadow-xs uppercase"
+              />
             </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                // Retour à la liste si on tape une nouvelle recherche
-                if (selectedVehicle) {
-                  setSelectedVehicle(null);
-                  setSelectedTicket(null);
-                }
-              }}
-              placeholder="Saisir la plaque d'immatriculation..."
-              className="w-full pl-10 pr-4 py-2.5 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-slate-400 shadow-sm hover:shadow transition-shadow"
-            />
+
+            <div className="flex gap-2">
+              <select
+                value={day}
+                onChange={(e) => setDay(e.target.value)}
+                className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-3 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">Jour (Tous)</option>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={String(d)}>{String(d).padStart(2, '0')}</option>
+                ))}
+              </select>
+
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-3 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">Mois (Tous)</option>
+                {MOIS_LABELS.map((m, i) => (
+                  <option key={m} value={String(i + 1)}>{m}</option>
+                ))}
+              </select>
+
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-3 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">Année (Toutes)</option>
+                {YEARS_OPTIONS.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
-
-          {/* Filtres date */}
-          <div className="flex gap-2">
-            <select
-              value={filters.jour}
-              onChange={(e) => setFilters((f) => ({ ...f, jour: e.target.value }))}
-              className="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer hover:border-slate-300 transition-colors"
-            >
-              <option value="">Jour</option>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={String(d)}>{String(d).padStart(2, "0")}</option>
-              ))}
-            </select>
-
-            <select
-              value={filters.mois}
-              onChange={(e) => setFilters((f) => ({ ...f, mois: e.target.value }))}
-              className="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer hover:border-slate-300 transition-colors"
-            >
-              <option value="">Mois</option>
-              {MOIS_LABELS.map((m, i) => (
-                <option key={m} value={String(i + 1)}>{m}</option>
-              ))}
-            </select>
-
-            <select
-              value={filters.annee}
-              onChange={(e) => setFilters((f) => ({ ...f, annee: e.target.value }))}
-              className="text-sm text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer hover:border-slate-300 transition-colors"
-            >
-              <option value="">Année</option>
-              {allYears.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+        )}
 
         {/* ══════════════════════════════════════
-            MASTER VIEW — Liste des véhicules
+            MASTER VIEW — Liste verticale pleine largeur
         ══════════════════════════════════════ */}
         {!selectedVehicle && (
           <section className="space-y-3">
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-widest px-1">
-              {filteredVehicles.length} véhicule{filteredVehicles.length !== 1 ? "s" : ""} trouvé{filteredVehicles.length !== 1 ? "s" : ""}
-            </p>
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">
+                {results.length} VÉHICULE{results.length > 1 ? 'S' : ''} TROUVÉ{results.length > 1 ? 'S' : ''}
+              </p>
+              {loading && (
+                <span className="text-xs font-bold text-blue-600 animate-pulse flex items-center gap-1">
+                  Recherche en cours...
+                </span>
+              )}
+            </div>
 
-            {filteredVehicles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-slate-200">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4 text-slate-300">
-                  <CarIcon className="h-8 w-8" />
-                </div>
-                <p className="text-slate-500 font-medium">Aucun véhicule trouvé</p>
-                <p className="text-sm text-slate-400 mt-1">Essayez une autre plaque d'immatriculation.</p>
+            {loading && results.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-500">Chargement de l'historique...</p>
+              </div>
+            ) : results.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-dashed border-slate-300 text-slate-400">
+                <CarIcon className="h-12 w-12 text-slate-300 mb-2" />
+                <p className="text-base font-bold text-slate-700">Aucun véhicule trouvé</p>
+                <p className="text-xs text-slate-400 mt-1">Essayez une autre immatriculation ou réinitialisez les filtres date.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filteredVehicles.map((v) => (
-                  <VehicleCard key={v.id} vehicle={v} onClick={handleVehicleClick} />
+              /* 1. Conteneur Parent (La Liste) : Strictly vertical and full width */
+              <div className="flex flex-col gap-4 w-full">
+                {results.map((vehicule) => (
+                  <VehicleCard key={vehicule.id} vehicle={vehicule} onClick={handleVehicleClick} />
                 ))}
               </div>
             )}
@@ -505,67 +398,52 @@ export default function HistoriqueRetoursView() {
         )}
 
         {/* ══════════════════════════════════════
-            DETAIL VIEW — Interventions véhicule
+            DETAIL VIEW — Interventions du véhicule
         ══════════════════════════════════════ */}
         {selectedVehicle && (
           <section className="space-y-4">
-            {/* Bouton retour */}
             <button
               onClick={handleBack}
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors duration-200"
+              className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline cursor-pointer"
             >
               <ArrowLeftIcon />
-              Retour à la liste
+              <span>Retour à la liste des véhicules</span>
             </button>
 
-            {/* En-tête véhicule sélectionné */}
-            <div className="flex items-center gap-4 p-5 bg-white border border-slate-200 rounded-2xl shadow-sm">
-              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-blue-50 text-blue-500">
-                <CarIcon className="h-8 w-8" />
+            <div className="flex items-center gap-4 p-5 bg-white border border-gray-100 rounded-xl shadow-sm">
+              <div className="flex-shrink-0 bg-white border-2 border-gray-800 text-gray-900 font-mono font-bold text-sm px-3 py-1 rounded-md whitespace-nowrap shadow-xs">
+                {immatSelected}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest">
-                  {selectedVehicle.immatriculation}
-                </p>
-                <h2 className="text-lg font-bold text-slate-800">
-                  {selectedVehicle.marque} {selectedVehicle.modele}{" "}
-                  {selectedVehicle.annee && (
-                    <span className="font-normal text-slate-500">{selectedVehicle.annee}</span>
-                  )}
+                <h2 className="text-xl font-bold text-gray-800 truncate">
+                  {selectedVehicle.marque}
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {selectedVehicle.tickets.length} intervention{selectedVehicle.tickets.length > 1 ? "s" : ""} au total
+                <p className="text-sm text-gray-500 mt-1">
+                  {totalInterventionsCount} intervention{totalInterventionsCount > 1 ? 's' : ''} enregistrée{totalInterventionsCount > 1 ? 's' : ''}
                 </p>
               </div>
             </div>
 
-            {/* Liste des tickets */}
-            <div className="space-y-2">
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-widest px-1">
-                Interventions ({filteredTickets.length})
+            <div className="space-y-3 pt-2">
+              <p className="text-xs font-extrabold text-slate-500 uppercase tracking-widest px-1">
+                Interventions ({selectedVehicle.interventions?.length || 0})
               </p>
 
-              {filteredTickets.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-slate-200">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3 text-slate-300">
-                    <TicketIcon className="h-6 w-6" />
-                  </div>
-                  <p className="text-slate-500 font-medium">Aucune intervention pour ces filtres</p>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Modifiez les filtres date pour voir d'autres résultats.
-                  </p>
+              {(!selectedVehicle.interventions || selectedVehicle.interventions.length === 0) ? (
+                <div className="bg-white rounded-xl p-8 text-center border border-gray-100 text-sm font-semibold text-gray-400">
+                  Aucune intervention enregistrée pour ce véhicule.
                 </div>
               ) : (
-                filteredTickets.map((t) => (
-                  <TicketRow key={t.id} ticket={t} onClick={setSelectedTicket} />
+                selectedVehicle.interventions.map((ticket) => (
+                  <TicketRow key={ticket.id} ticket={ticket} onClick={setSelectedTicket} />
                 ))
               )}
             </div>
           </section>
         )}
+
       </div>
 
-      {/* MODALE */}
       <TicketModal
         ticket={selectedTicket}
         vehicle={selectedVehicle}
@@ -573,5 +451,5 @@ export default function HistoriqueRetoursView() {
         onDeclarer={handleDeclarer}
       />
     </div>
-  );
+  )
 }

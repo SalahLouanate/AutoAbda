@@ -487,6 +487,11 @@ export default function MonProfilView() {
           </div>
         </section>
 
+        {/* ══════════════════════════════════════════════════════════════════
+            SECTION 3 — Configuration Fermeture Automatique de l'Atelier
+        ══════════════════════════════════════════════════════════════════ */}
+        <AutoClosingTimeConfig showToast={showToast} />
+
         {/* Espace bas de page */}
         <div className="pb-4" />
       </div>
@@ -494,5 +499,132 @@ export default function MonProfilView() {
       {/* ── TOAST NOTIFICATION ─────────────────────────────────────────────── */}
       <Toast message={toast.message} visible={toast.visible} />
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPOSANT CONFIGURATION FERMETURE AUTOMATIQUE
+// ─────────────────────────────────────────────────────────────────────────────
+function IcoClock() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  )
+}
+
+function AutoClosingTimeConfig({ showToast }) {
+  const [closingTime, setClosingTime] = useState('19:00')
+  const [loading, setLoading]         = useState(true)
+  const [saving, setSaving]           = useState(false)
+  const [errorMsg, setErrorMsg]       = useState('')
+  const [successMsg, setSuccessMsg]   = useState('')
+
+  useEffect(() => {
+    async function fetchConfig() {
+      try {
+        setLoading(true)
+        const response = await api.get('/settings/auto-closing-time')
+        const time = response.data?.auto_closing_time || response.data?.value || '19:00'
+        setClosingTime(time)
+      } catch (err) {
+        console.error('Erreur lors du chargement de l\'heure de fermeture:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchConfig()
+  }, [])
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!closingTime) {
+      setErrorMsg('Veuillez spécifier une heure valide.')
+      return
+    }
+
+    try {
+      setSaving(true)
+      setErrorMsg('')
+      setSuccessMsg('')
+
+      const response = await api.put('/settings/auto-closing-time', {
+        auto_closing_time: closingTime,
+      })
+
+      const msg = response.data?.message || 'Heure de fermeture automatique mise à jour.'
+      setSuccessMsg(msg)
+      if (showToast) showToast(msg)
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde de l\'heure de fermeture:', err)
+      setErrorMsg(err.response?.data?.message || 'Erreur lors de la sauvegarde.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="bg-white shadow-sm rounded-2xl border border-slate-200 overflow-hidden">
+      {/* Header section */}
+      <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+          <IcoClock />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-800">Paramètres de l'Atelier</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Configuration du cycle quotidien et fermeture automatique</p>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <form onSubmit={handleSave} noValidate>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="auto-closing-time" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Heure de fermeture automatique de l'atelier
+              </label>
+              <p className="text-xs text-slate-500 mb-3">
+                À cette heure, toute intervention de la veille restée non clôturée sera automatiquement marquée comme 'Terminée'.
+              </p>
+              <div className="max-w-xs">
+                <input
+                  id="auto-closing-time"
+                  type="time"
+                  value={closingTime}
+                  onChange={e => setClosingTime(e.target.value)}
+                  disabled={loading}
+                  className="w-full text-sm font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            {/* Messages de retour */}
+            {successMsg && (
+              <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                ✓ {successMsg}
+              </p>
+            )}
+            {errorMsg && (
+              <p className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                ⚠ {errorMsg}
+              </p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={saving || loading}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-md shadow-amber-600/20 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+                </svg>
+                {saving ? 'Enregistrement...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
   )
 }

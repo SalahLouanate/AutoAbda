@@ -5,11 +5,11 @@ namespace App\Events;
 use App\Models\Intervention;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class NewVehicleArrived implements ShouldBroadcast
+class NewVehicleArrived implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -26,11 +26,9 @@ class NewVehicleArrived implements ShouldBroadcast
     /**
      * Get the channels the event should broadcast on.
      */
-    public function broadcastOn(): array
+    public function broadcastOn(): Channel
     {
-        return [
-            new Channel('atelier'),
-        ];
+        return new Channel('atelier');
     }
 
     /**
@@ -38,7 +36,7 @@ class NewVehicleArrived implements ShouldBroadcast
      */
     public function broadcastAs(): string
     {
-        return 'NewVehicleArrived';
+        return 'intervention.updated';
     }
 
     /**
@@ -47,13 +45,13 @@ class NewVehicleArrived implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'id' => $this->intervention->id,
-            'immat' => $this->intervention->vehicule ? $this->intervention->vehicule->matricule : 'N/A',
-            'marque' => $this->intervention->vehicule ? "{$this->intervention->vehicule->marque} {$this->intervention->vehicule->modele}" : 'Véhicule N/A',
-            'statut' => $this->intervention->statut,
+            'id'                => $this->intervention->id,
+            'immat'             => $this->intervention->vehicule ? $this->intervention->vehicule->matricule : 'N/A',
+            'marque'            => $this->intervention->vehicule ? "{$this->intervention->vehicule->marque} {$this->intervention->vehicule->modele}" : 'Véhicule N/A',
+            'statut'            => $this->intervention->statut,
             'type_intervention' => $this->intervention->type_intervention,
-            'heure' => $this->intervention->created_at ? $this->intervention->created_at->format('H:i') : now()->format('H:i'),
-            'rdv' => false,
+            'heure'             => $this->intervention->created_at ? $this->intervention->created_at->format('H:i') : now()->format('H:i'),
+            'rdv'               => (bool) ($this->intervention->is_rdv ?? false),
         ];
     }
 }

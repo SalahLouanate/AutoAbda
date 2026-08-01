@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class InterventionStatusChanged implements ShouldBroadcastNow
+class TicketStatusUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -24,11 +24,11 @@ class InterventionStatusChanged implements ShouldBroadcastNow
     }
 
     /**
-     * Diffuser sur le canal public 'atelier'.
+     * Broadcast on public channel 'garage'.
      */
     public function broadcastOn(): Channel
     {
-        return new Channel('atelier');
+        return new Channel('garage');
     }
 
     /**
@@ -36,11 +36,11 @@ class InterventionStatusChanged implements ShouldBroadcastNow
      */
     public function broadcastAs(): string
     {
-        return 'intervention.updated';
+        return 'TicketStatusUpdated';
     }
 
     /**
-     * Données transmises au front-end.
+     * Données transmises au front-end pour la mise à jour dynamique.
      */
     public function broadcastWith(): array
     {
@@ -54,6 +54,7 @@ class InterventionStatusChanged implements ShouldBroadcastNow
             'date_fin'           => $this->intervention->date_fin ? $this->intervention->date_fin->toISOString() : null,
             'temps_bareme_total' => $this->intervention->temps_bareme_total,
             'bareme'             => $this->intervention->temps_bareme_total,
+            'technicien_id'     => $this->intervention->user_id,
             'vehicule'          => $this->intervention->vehicule ? [
                 'id'        => $this->intervention->vehicule->id,
                 'matricule' => $this->intervention->vehicule->matricule,
@@ -66,9 +67,10 @@ class InterventionStatusChanged implements ShouldBroadcastNow
                 'statut' => $this->intervention->pont->statut,
             ] : null,
             'technicien'        => $this->intervention->user ? [
-                'id'    => $this->intervention->user->id,
-                'name'  => $this->intervention->user->name,
-                'email' => $this->intervention->user->email,
+                'id'          => $this->intervention->user->id,
+                'nom'         => $this->intervention->user->name,
+                'nom_complet' => $this->intervention->user->name,
+                'name'        => $this->intervention->user->name,
             ] : null,
         ];
     }

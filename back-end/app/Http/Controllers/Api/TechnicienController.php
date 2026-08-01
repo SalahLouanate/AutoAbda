@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Events\InterventionStatusChanged;
+use App\Events\PontStatusUpdated;
+use App\Events\TicketStatusUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Intervention;
 use App\Models\Pont;
@@ -13,8 +15,8 @@ use Illuminate\Http\Request;
 class TechnicienController extends Controller
 {
     /**
-     * Récupérer l'intervention active ('En cours', 'Bloqué' ou 'En attente') assignée au technicien connecté.
-     * Filtre sur la journée en cours tout en remontant les tâches non terminées des jours précédents.
+     * Récupérer la liste complète des interventions ('En cours', 'Bloqué' ou 'En attente') assignées au technicien connecté.
+     * Retourne TOUS les véhicules assignés par ordre de priorité et d'arrivée (FIFO).
      */
     public function getCurrentTask(Request $request): JsonResponse
     {
@@ -22,35 +24,21 @@ class TechnicienController extends Controller
 
         $interventions = Intervention::with(['vehicule', 'pont'])
             ->where('user_id', $userId)
-            ->where(function ($query) {
-                $query->whereDate('created_at', Carbon::today())
-                      ->orWhereNotIn('statut', ['Terminé', 'Annulé']);
-            })
             ->whereIn('statut', ['En cours', 'Bloqué', 'En attente'])
+            ->orderByRaw("CASE WHEN LOWER(statut) IN ('en cours', 'en_cours') THEN 1 WHEN LOWER(statut) IN ('bloqué', 'bloque') THEN 2 WHEN LOWER(statut) IN ('en attente', 'en_attente') THEN 3 ELSE 4 END")
+            ->orderByRaw("COALESCE(is_rdv, 0) DESC")
+            ->orderBy('created_at', 'asc')
             ->get();
 
-        // Donne la priorité à 'En cours', puis 'Bloqué', puis 'En attente'
-        $intervention = $interventions->sortBy(function ($item) {
-            if ($item->statut === 'En cours') return 0;
-            if ($item->statut === 'Bloqué') return 1;
-            return 2;
-        })->first();
-
-        if (!$intervention) {
-            return response()->json([
-                'message'      => 'Aucune intervention en cours',
-                'intervention' => null,
-            ], 200);
-        }
-
         return response()->json([
-            'message'      => 'Intervention récupérée avec succès',
-            'intervention' => $intervention,
+            'message'       => 'Interventions récupérées avec succès',
+            'interventions' => $interventions,
+            'intervention'  => $interventions->first() ?? null,
         ], 200);
     }
 
     /**
-     * Démarrer une intervention.
+     * Démarrer une intervention (Mise à jour statut => 'En cours', started_at / date_debut => now()).
      */
     public function startTask(Request $request, $id): JsonResponse
     {
@@ -62,12 +50,20 @@ class TechnicienController extends Controller
             ], 404);
         }
 
-        if ($intervention->user_id !== $request->user()->id) {
+        $user = $request->user();
+
+        if ($intervention->user_id !== $user->id) {
             return response()->json([
                 'message' => 'Non autorisé. Cette intervention ne vous est pas assignée.',
             ], 403);
         }
 
+        // Affectation automatique du pont du technicien s'il n'est pas encore défini
+        if (!$intervention->pont_id && $user->pont_id) {
+            $intervention->pont_id = $user->pont_id;
+        }
+
+        // 1. Mise à jour explicite du statut et enregistrement du timestamp de début (started_at)
         $intervention->statut = 'En cours';
         $intervention->motif_blocage = null;
         if (!$intervention->date_debut) {
@@ -75,6 +71,7 @@ class TechnicienController extends Controller
         }
         $intervention->save();
 
+        // Passation du pont en statut 'Occupé'
         if ($intervention->pont_id) {
             $pont = Pont::find($intervention->pont_id);
             if ($pont) {
@@ -84,7 +81,10 @@ class TechnicienController extends Controller
 
         $intervention->load(['vehicule', 'pont', 'user']);
 
+        // 2. Diffusion immédiate des événements Temps Réel Reverb via ShouldBroadcastNow
+        broadcast(new TicketStatusUpdated($intervention));
         broadcast(new InterventionStatusChanged($intervention));
+        broadcast(new PontStatusUpdated());
 
         return response()->json([
             'message'      => 'Intervention démarrée avec succès.',
@@ -121,7 +121,9 @@ class TechnicienController extends Controller
 
         $intervention->load(['vehicule', 'pont', 'user']);
 
+        broadcast(new TicketStatusUpdated($intervention));
         broadcast(new InterventionStatusChanged($intervention));
+        broadcast(new PontStatusUpdated());
 
         return response()->json([
             'message'      => 'Intervention marquée comme bloquée.',
@@ -161,7 +163,9 @@ class TechnicienController extends Controller
 
         $intervention->load(['vehicule', 'pont', 'user']);
 
+        broadcast(new TicketStatusUpdated($intervention));
         broadcast(new InterventionStatusChanged($intervention));
+        broadcast(new PontStatusUpdated());
 
         return response()->json([
             'message'      => 'Intervention terminée avec succès.',

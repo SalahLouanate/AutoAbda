@@ -5,6 +5,8 @@ import ReceptionLayout from './layouts/ReceptionLayout'
 import TechnicianLayout from './layouts/TechnicianLayout'
 import DirectionLayout from './layouts/DirectionLayout'
 
+import TicketPrintView from './views/TicketPrintView'
+
 // Helper function to resolve dashboard path by user role
 function getRoleDashboardPath(role) {
   const normalizedRole = role?.toLowerCase()
@@ -49,6 +51,9 @@ function RootRoute() {
 function AppRoutes() {
   return (
     <Routes>
+      {/* Route dédiée à l'impression isolée de ticket */}
+      <Route path="/print/ticket/:id" element={<TicketPrintView />} />
+
       {/* Route racine / et /login -> LoginView */}
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<RootRoute />} />

@@ -14,16 +14,20 @@ use Illuminate\Http\Request;
 class DirectionController extends Controller
 {
     /**
-     * Helper pour estimer le barème prévisionnel de l'intervention (en minutes).
+     * Helper pour calculer le barème prévisionnel réel de l'intervention (en minutes).
      */
-    private function getBareme(?string $type): int
+    private function getBareme(?string $type, ?Intervention $intervention = null): int
     {
-        $typeLower = mb_strtolower($type ?? '');
-        if (str_contains($typeLower, 'vidange')) return 45;
-        if (str_contains($typeLower, 'diagnostic')) return 60;
-        if (str_contains($typeLower, 'frein')) return 90;
-        if (str_contains($typeLower, 'distribution')) return 180;
-        if (str_contains($typeLower, 'amortisseur') || str_contains($typeLower, 'suspension')) return 120;
+        if ($intervention) {
+            return $intervention->temps_bareme_total;
+        }
+
+        if ($type) {
+            $types = array_map('trim', explode(',', $type));
+            $sum = (int) Prestation::whereIn('nom', $types)->sum('temps_bareme');
+            if ($sum > 0) return $sum;
+        }
+
         return 60;
     }
 
@@ -61,11 +65,13 @@ class DirectionController extends Controller
     {
         $today = Carbon::today();
 
-        // 1. Récupération des 5 ponts avec techniciens actifs (is_active = true) et interventions actives
+        // 1. Récupération des 5 ponts avec techniciens actifs (is_active = true) et interventions actives du jour
         $ponts = Pont::with(['users' => function ($query) {
             $query->where('is_active', true);
         }, 'interventions' => function ($query) {
-            $query->whereIn('statut', ['En cours', 'Bloqué'])->with(['vehicule', 'user']);
+            $query->whereDate('created_at', \Carbon\Carbon::today())
+                ->whereIn('statut', ['En cours', 'Bloqué'])
+                ->with(['vehicule', 'user']);
         }])->orderBy('id')->get();
 
         $totalPonts = $ponts->count() > 0 ? $ponts->count() : 5;
@@ -139,23 +145,31 @@ class DirectionController extends Controller
 
         $pourcentageOccupation = $totalPonts > 0 ? round(($pontsOccupesCount / $totalPonts) * 100, 1) : 0;
 
-        $interventionsDuJour = Intervention::whereDate('created_at', $today)->count();
-        $termineesAujourdhui = Intervention::where('statut', 'Terminé')
-            ->where(function ($query) use ($today) {
-                $query->whereDate('date_fin', $today)
-                    ->orWhereDate('updated_at', $today);
-            })->count();
+        // 2. Calcul des KPIs strictement filtrés sur la date du jour (created_at = Carbon::today())
+        $totalAujourdhui = Intervention::whereDate('created_at', \Carbon\Carbon::today())->count();
+        $clotureesAujourdhui = Intervention::whereDate('created_at', \Carbon\Carbon::today())
+            ->where('statut', 'Terminé')
+            ->count();
+
+        $kpisPayload = [
+            'total_aujourdhui'       => $totalAujourdhui,
+            'cloturees_aujourdhui'    => $clotureesAujourdhui,
+            'ponts_occupes'          => $pontsOccupesCount,
+            'ponts_libres'           => $pontsLibresCount,
+            'pourcentage_occupation' => $pourcentageOccupation,
+            'interventions_du_jour'  => $totalAujourdhui,
+            'terminees_aujourdhui'   => $clotureesAujourdhui,
+        ];
 
         return response()->json([
-            'kpis' => [
-                'ponts_occupes' => $pontsOccupesCount,
-                'pourcentage_occupation' => $pourcentageOccupation,
-                'ponts_libres' => $pontsLibresCount,
-                'interventions_du_jour' => $interventionsDuJour,
-                'terminees_aujourdhui' => $termineesAujourdhui,
-            ],
-            'charge_travail' => $chargeTravail,
-            'ponts' => $pontsSupervision,
+            'status'                 => 'success',
+            'total_aujourdhui'       => $totalAujourdhui,
+            'cloturees_aujourdhui'    => $clotureesAujourdhui,
+            'ponts_occupes'          => $pontsOccupesCount,
+            'ponts_libres'           => $pontsLibresCount,
+            'kpis'                   => $kpisPayload,
+            'charge_travail'         => $chargeTravail,
+            'ponts'                  => $pontsSupervision,
         ], 200);
     }
 
@@ -184,21 +198,18 @@ class DirectionController extends Controller
                 $query->where('is_active', true);
             })
             ->with(['vehicule', 'user', 'pont'])
-            ->where(function ($query) use ($targetDate, $isToday) {
+            ->where(function ($query) use ($targetDate) {
                 $query->whereDate('created_at', $targetDate)
                     ->orWhereDate('date_debut', $targetDate)
                     ->orWhereDate('date_fin', $targetDate);
-
-                if ($isToday) {
-                    $query->orWhereIn('statut', ['En cours', 'Bloqué', 'En attente']);
-                }
             })
             ->orderByRaw("FIELD(statut, 'En cours', 'Bloqué', 'En attente', 'Terminé')")
             ->orderBy('updated_at', 'desc')
             ->get();
 
         $payload = $interventions->map(function ($item) {
-            $bareme = $this->getBareme($item->type_intervention);
+            $item->loadMissing('vehicule.prestations');
+            $bareme = $item->temps_bareme_total;
             
             $tempsPasse = 0;
             if ($item->date_debut) {
@@ -215,8 +226,10 @@ class DirectionController extends Controller
                 'motif_blocage'      => $item->motif_blocage,
                 'heure_arrivee'      => $item->created_at ? $item->created_at->format('H:i') : null,
                 'date_debut'         => $item->date_debut ? $item->date_debut->toIso8601String() : null,
+                'started_at'         => $item->date_debut ? $item->date_debut->toIso8601String() : null,
                 'date_fin'           => $item->date_fin ? $item->date_fin->toIso8601String() : null,
                 'bareme'             => $bareme,
+                'temps_bareme_total' => $bareme,
                 'temps_passe'        => $tempsPasse,
                 'est_en_retard'      => $estEnRetard,
                 'vehicule'           => $item->vehicule ? [
@@ -256,11 +269,11 @@ class DirectionController extends Controller
      */
     public function bilanMensuel(Request $request): JsonResponse
     {
-        $mode = strtolower($request->query('mode', 'month'));
+        $periode = strtolower($request->query('periode', $request->query('mode', 'mois')));
         $dateParam = $request->query('date');
         $rate = (float) $request->query('rate', $request->query('commissionRate', 35));
 
-        $isTodayMode = in_array($mode, ['today', 'jour', 'day']);
+        $isTodayMode = in_array($periode, ['aujourdhui', 'today', 'jour', 'day']);
 
         if ($dateParam) {
             try {
@@ -273,24 +286,24 @@ class DirectionController extends Controller
         }
 
         if ($isTodayMode) {
-            $startDate = (clone $targetCarbon)->startOfDay();
-            $endDate = (clone $targetCarbon)->endOfDay();
-            $periodLabel = $startDate->locale('fr')->translatedFormat('d F Y');
+            $periodLabel = $targetCarbon->locale('fr')->translatedFormat('d F Y');
         } else {
             $month = (int) ($request->query('month') ?? $targetCarbon->month);
             $year = (int) ($request->query('year') ?? $targetCarbon->year);
-            $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
-            $endDate = (clone $startDate)->endOfMonth();
-            $periodLabel = $startDate->locale('fr')->translatedFormat('F Y');
+            $targetCarbon = Carbon::createFromDate($year, $month, 1);
+            $periodLabel = $targetCarbon->locale('fr')->translatedFormat('F Y');
         }
 
-        // Récupérer toutes les interventions clôturées ("Terminé") de la période spécifiée
+        // Récupérer toutes les interventions clôturées ("Terminé") de la période spécifiée via when()
         $interventionsCloturees = Intervention::with(['vehicule', 'user', 'pont'])
             ->where('statut', 'Terminé')
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->whereBetween('date_fin', [$startDate, $endDate])
-                    ->orWhereBetween('updated_at', [$startDate, $endDate])
-                    ->orWhereBetween('created_at', [$startDate, $endDate]);
+            ->when($isTodayMode, function ($query) use ($targetCarbon) {
+                return $query->whereDate('created_at', $targetCarbon)
+                             ->whereDate('date_fin', $targetCarbon);
+            })
+            ->when(!$isTodayMode, function ($query) use ($targetCarbon) {
+                return $query->whereMonth('created_at', $targetCarbon->month)
+                             ->whereYear('created_at', $targetCarbon->year);
             })
             ->get();
 
@@ -318,10 +331,11 @@ class DirectionController extends Controller
             $caTech = 0;
 
             foreach ($techInterventions as $item) {
-                $bareme = $this->getBareme($item->type_intervention);
+                $item->loadMissing('vehicule.prestations');
+                $bareme = $item->temps_bareme_total;
                 $baremeMinSum += $bareme;
 
-                // Calcul du temps passé en minutes
+                // Calcul du temps passé réel en minutes (date_debut -> date_fin)
                 $tempsPasse = 0;
                 if ($item->date_debut && $item->date_fin) {
                     $tempsPasse = max(1, (int) round(Carbon::parse($item->date_debut)->diffInMinutes(Carbon::parse($item->date_fin))));
@@ -383,11 +397,10 @@ class DirectionController extends Controller
         return response()->json([
             'message' => 'Bilan et calcul des primes générés avec succès.',
             'periode' => [
-                'mode'  => $isTodayMode ? 'today' : 'month',
-                'label' => $periodLabel,
-                'start' => $startDate->toIso8601String(),
-                'end'   => $endDate->toIso8601String(),
-                'rate'  => $rate,
+                'mode'    => $isTodayMode ? 'aujourdhui' : 'mois',
+                'periode' => $periode,
+                'label'   => $periodLabel,
+                'rate'    => $rate,
             ],
             'kpis_globaux' => [
                 'total_interventions'        => $interventionsCloturees->count(),

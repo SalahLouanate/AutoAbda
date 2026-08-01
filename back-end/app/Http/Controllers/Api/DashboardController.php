@@ -21,8 +21,8 @@ class DashboardController extends Controller
         // 1. Nombre total de ponts
         $totalPonts = Pont::count();
 
-        // 2. Nombre d'interventions avec le statut 'En cours'
-        $pontsActifs = Intervention::where('statut', 'En cours')->count();
+        // 2. Nombre d'interventions avec le statut 'En cours' aujourd'hui
+        $pontsActifs = Intervention::whereDate('created_at', $today)->where('statut', 'En cours')->count();
 
         // 3. Taux d'occupation (pourcentage)
         $tauxOccupation = $totalPonts > 0 ? round(($pontsActifs / $totalPonts) * 100, 2) : 0;
