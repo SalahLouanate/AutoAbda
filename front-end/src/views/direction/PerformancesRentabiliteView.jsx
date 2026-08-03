@@ -169,7 +169,7 @@ export default function PerformancesRentabiliteView() {
   const totalAchetees   = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalFacturees  = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalPrime      = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
-  const tauxEfficacite  = useMemo(() => bilanData?.kpis_globaux?.taux_efficacite_global ?? (totalAchetees > 0 ? Math.round((totalAchetees / (totalFacturees || 1)) * 100) : 100), [bilanData, totalAchetees, totalFacturees])
+  const tauxEfficacite  = useMemo(() => bilanData?.kpis_globaux?.taux_efficacite_global ?? (totalAchetees > 0 ? Math.round((totalAchetees / (totalFacturees || 1)) * 100) : 0), [bilanData, totalAchetees, totalFacturees])
   const totalBilanNet   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.bilanNet, 0).toFixed(2)), [donneesActuelles])
   const totalMalusSAV   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0).toFixed(2)), [donneesActuelles])
 
@@ -307,16 +307,30 @@ export default function PerformancesRentabiliteView() {
 
           {/* 3. Taux d'Efficacité */}
           <div className={`border rounded-2xl p-5 shadow-sm flex items-center gap-4 ${
-            tauxEfficacite >= 100 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+            tauxEfficacite === 0
+              ? 'bg-slate-50 border-slate-200'
+              : tauxEfficacite >= 100
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-amber-50 border-amber-200'
           }`}>
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-              tauxEfficacite >= 100 ? 'bg-emerald-100 text-emerald-500' : 'bg-amber-100 text-amber-500'
+              tauxEfficacite === 0
+                ? 'bg-slate-100 text-slate-400'
+                : tauxEfficacite >= 100
+                ? 'bg-emerald-100 text-emerald-500'
+                : 'bg-amber-100 text-amber-500'
             }`}>
               <IcoCheck />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Efficacité Globale</p>
-              <p className={`text-2xl font-black leading-none ${tauxEfficacite >= 100 ? 'text-emerald-700' : 'text-amber-700'}`}>
+              <p className={`text-2xl font-black leading-none ${
+                tauxEfficacite === 0
+                  ? 'text-slate-600'
+                  : tauxEfficacite >= 100
+                  ? 'text-emerald-700'
+                  : 'text-amber-700'
+              }`}>
                 {tauxEfficacite}%
               </p>
               <p className="text-xs text-slate-400 mt-1">Objectif : 100%</p>

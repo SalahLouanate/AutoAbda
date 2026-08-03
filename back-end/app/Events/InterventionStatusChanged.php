@@ -24,11 +24,14 @@ class InterventionStatusChanged implements ShouldBroadcastNow
     }
 
     /**
-     * Diffuser sur le canal public 'atelier'.
+     * Diffuser sur les canaux publics 'atelier' et 'garage' simultanément.
      */
-    public function broadcastOn(): Channel
+    public function broadcastOn(): array
     {
-        return new Channel('atelier');
+        return [
+            new Channel('atelier'),
+            new Channel('garage'),
+        ];
     }
 
     /**
@@ -45,27 +48,28 @@ class InterventionStatusChanged implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'id'                => $this->intervention->id,
-            'statut'            => $this->intervention->statut,
-            'motif_blocage'     => $this->intervention->motif_blocage,
+            'id'                 => $this->intervention->id,
+            'statut'             => $this->intervention->statut,
+            'motif_blocage'      => $this->intervention->motif_blocage,
             'type_intervention'  => $this->intervention->type_intervention,
             'date_debut'         => $this->intervention->date_debut ? $this->intervention->date_debut->toISOString() : null,
             'started_at'         => $this->intervention->date_debut ? $this->intervention->date_debut->toISOString() : null,
             'date_fin'           => $this->intervention->date_fin ? $this->intervention->date_fin->toISOString() : null,
             'temps_bareme_total' => $this->intervention->temps_bareme_total,
             'bareme'             => $this->intervention->temps_bareme_total,
-            'vehicule'          => $this->intervention->vehicule ? [
+            'technicien_id'      => $this->intervention->user_id,
+            'vehicule'           => $this->intervention->vehicule ? [
                 'id'        => $this->intervention->vehicule->id,
                 'matricule' => $this->intervention->vehicule->matricule,
                 'marque'    => $this->intervention->vehicule->marque,
                 'modele'    => $this->intervention->vehicule->modele,
             ] : null,
-            'pont'              => $this->intervention->pont ? [
+            'pont'               => $this->intervention->pont ? [
                 'id'     => $this->intervention->pont->id,
                 'nom'    => $this->intervention->pont->nom,
                 'statut' => $this->intervention->pont->statut,
             ] : null,
-            'technicien'        => $this->intervention->user ? [
+            'technicien'         => $this->intervention->user ? [
                 'id'    => $this->intervention->user->id,
                 'name'  => $this->intervention->user->name,
                 'email' => $this->intervention->user->email,

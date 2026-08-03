@@ -63,7 +63,7 @@ class TechnicienController extends Controller
             $intervention->pont_id = $user->pont_id;
         }
 
-        // 1. Mise à jour explicite du statut et enregistrement du timestamp de début (started_at)
+        // 1. Mise à jour statut et timestamp
         $intervention->statut = 'En cours';
         $intervention->motif_blocage = null;
         if (!$intervention->date_debut) {
@@ -71,20 +71,16 @@ class TechnicienController extends Controller
         }
         $intervention->save();
 
-        // Passation du pont en statut 'Occupé'
+        // 2. Mise à jour SQL directe du pont
         if ($intervention->pont_id) {
-            $pont = Pont::find($intervention->pont_id);
-            if ($pont) {
-                $pont->update(['statut' => 'Occupé']);
-            }
+            Pont::where('id', $intervention->pont_id)->update(['statut' => 'Occupé']);
         }
 
-        $intervention->load(['vehicule', 'pont', 'user']);
+        // 3. Chargement ultra léger des relations
+        $intervention->load(['vehicule:id,matricule,marque,modele', 'pont:id,nom,statut', 'user:id,name,email']);
 
-        // 2. Diffusion immédiate des événements Temps Réel Reverb via ShouldBroadcastNow
-        broadcast(new TicketStatusUpdated($intervention));
+        // 4. Single multi-channel broadcast (atelier & garage)
         broadcast(new InterventionStatusChanged($intervention));
-        broadcast(new PontStatusUpdated());
 
         return response()->json([
             'message'      => 'Intervention démarrée avec succès.',
@@ -119,11 +115,9 @@ class TechnicienController extends Controller
         $intervention->motif_blocage = $request->input('motif');
         $intervention->save();
 
-        $intervention->load(['vehicule', 'pont', 'user']);
+        $intervention->load(['vehicule:id,matricule,marque,modele', 'pont:id,nom,statut', 'user:id,name,email']);
 
-        broadcast(new TicketStatusUpdated($intervention));
         broadcast(new InterventionStatusChanged($intervention));
-        broadcast(new PontStatusUpdated());
 
         return response()->json([
             'message'      => 'Intervention marquée comme bloquée.',
@@ -155,17 +149,12 @@ class TechnicienController extends Controller
         $intervention->save();
 
         if ($intervention->pont_id) {
-            $pont = Pont::find($intervention->pont_id);
-            if ($pont) {
-                $pont->update(['statut' => 'Libre']);
-            }
+            Pont::where('id', $intervention->pont_id)->update(['statut' => 'Libre']);
         }
 
-        $intervention->load(['vehicule', 'pont', 'user']);
+        $intervention->load(['vehicule:id,matricule,marque,modele', 'pont:id,nom,statut', 'user:id,name,email']);
 
-        broadcast(new TicketStatusUpdated($intervention));
         broadcast(new InterventionStatusChanged($intervention));
-        broadcast(new PontStatusUpdated());
 
         return response()->json([
             'message'      => 'Intervention terminée avec succès.',

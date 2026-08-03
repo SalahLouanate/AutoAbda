@@ -211,7 +211,7 @@ export default function FileAttenteView() {
   const [activeFilter, setActiveFilter] = useState('Tous')
   const [loading, setLoading] = useState(true)
 
-  // 3. Appel API GET /api/reception/file-attente
+  // 3. Appel API GET /api/reception/file-attente (tous les statuts, y compris Terminé)
   const fetchFileAttente = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true)
@@ -334,9 +334,10 @@ export default function FileAttenteView() {
   })
 
   const vehiculesFiltres = sortedVehicules.filter((v) => {
-    if (activeFilter === 'En attente') return v.statut === 'En attente'
-    if (activeFilter === 'En cours') return v.statut === 'En cours' || v.statut === 'Bloqué'
-    if (activeFilter === 'Terminés') return v.statut === 'Terminé'
+    const st = String(v.statut || '').toLowerCase()
+    if (activeFilter === 'En attente') return st === 'en attente' || st === 'en_attente'
+    if (activeFilter === 'En cours') return st === 'en cours' || st === 'en_cours' || st === 'bloqué' || st === 'bloque'
+    if (activeFilter === 'Terminés') return st === 'terminé' || st === 'termine'
     return true // 'Tous'
   })
 

@@ -10,7 +10,7 @@ use App\Models\Intervention;
 use App\Models\Prestation;
 use App\Models\User;
 use App\Models\Vehicule;
-use Carbon\Carbon;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -49,61 +49,33 @@ class ReceptionController extends Controller
      * Obtenir la liste des véhicules / tickets en attente.
      * Trié par priorité RDV (is_rdv desc) puis par ordre d'arrivée FIFO (created_at asc).
      */
-    public function getTickets(): JsonResponse
-    {
-        $interventions = Intervention::with(['vehicule.prestations', 'technicien'])
-            ->whereIn('statut', ['En attente', 'En cours', 'Bloqué'])
-            ->orderByRaw("CASE WHEN LOWER(statut) IN ('en cours', 'en_cours') THEN 1 WHEN LOWER(statut) IN ('bloqué', 'bloque') THEN 2 WHEN LOWER(statut) IN ('en attente', 'en_attente') THEN 3 ELSE 4 END")
-            ->orderByRaw("COALESCE(is_rdv, 0) DESC")
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        $tickets = $interventions->map(function ($item) {
-            $interventionsList = $item->vehicule && $item->vehicule->prestations->isNotEmpty()
-                ? $item->vehicule->prestations->pluck('nom')->toArray()
-                : (explode(', ', $item->type_intervention ?? ''));
-
-            $nomVehicule = $item->vehicule 
-                ? trim("{$item->vehicule->marque} {$item->vehicule->modele}")
-                : 'Inconnu';
-
-            return [
-                'id'            => $item->id,
-                'immat'         => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
-                'marque'        => $nomVehicule,
-                'interventions' => array_values(array_filter($interventionsList)),
-                'rdv'           => (bool) ($item->is_rdv ?? false),
-                'heure'         => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
-                'statut'        => $item->statut,
-                'technicien'    => $item->technicien ? [
-                    'id'   => $item->technicien->id,
-                    'nom'  => $item->technicien->name,
-                    'name' => $item->technicien->name,
-                ] : null,
-            ];
-        });
-
-        return response()->json([
-            'status'    => 'success',
-            'tickets'   => $tickets,
-            'vehicules' => $tickets,
-        ]);
-    }
-
     /**
-     * Obtenir la file d'attente complète & le suivi temps réel pour le module Réception.
-     * GET /api/reception/file-attente
+     * Obtenir la liste des véhicules / tickets en attente et en cours.
+     * Trié par priorité d'activité ('en_attente' => 1, 'en_cours' => 2, 'bloqué' => 3, 'terminé' => 4)
      */
-    public function getFileAttente(): JsonResponse
+    public function getTickets(Request $request): JsonResponse
     {
-        $interventions = Intervention::with(['vehicule.prestations', 'technicien', 'pont'])
-            ->whereIn('statut', ['En attente', 'En cours', 'Bloqué'])
-            ->orderByRaw("CASE WHEN LOWER(statut) IN ('en cours', 'en_cours') THEN 1 WHEN LOWER(statut) IN ('bloqué', 'bloque') THEN 2 WHEN LOWER(statut) IN ('en attente', 'en_attente') THEN 3 ELSE 4 END")
-            ->orderByRaw("COALESCE(is_rdv, 0) DESC")
-            ->orderBy('created_at', 'asc')
-            ->get();
+        $perPage = (int) $request->query('per_page', 10);
+        $page = (int) $request->query('page', 1);
 
-        $vehicules = $interventions->map(function ($item) {
+        $query = Intervention::with(['vehicule.prestations', 'technicien', 'pont'])
+            ->whereDate('created_at', Carbon::today())
+            ->whereIn(DB::raw('LOWER(statut)'), [
+                'en cours', 'en_cours',
+                'en attente', 'en_attente',
+                'bloqué', 'bloque',
+            ])
+            ->orderByRaw("CASE
+                WHEN LOWER(statut) IN ('en cours', 'en_cours') THEN 1
+                WHEN LOWER(statut) IN ('bloqué', 'bloque')    THEN 2
+                WHEN LOWER(statut) IN ('en attente', 'en_attente') THEN 3
+                ELSE 4 END")
+            ->orderByRaw("COALESCE(is_rdv, 0) DESC")
+            ->orderBy('created_at', 'asc');
+
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+
+        $tickets = collect($paginator->items())->map(function ($item) {
             $interventionsList = $item->vehicule && $item->vehicule->prestations->isNotEmpty()
                 ? $item->vehicule->prestations->pluck('nom')->toArray()
                 : (explode(', ', $item->type_intervention ?? ''));
@@ -112,6 +84,14 @@ class ReceptionController extends Controller
                 ? trim("{$item->vehicule->marque} {$item->vehicule->modele}")
                 : 'Inconnu';
 
+            $rawStatut = $item->statut ?? 'En attente';
+            $normalizedStatut = match(strtolower($rawStatut)) {
+                'en cours', 'en_cours' => 'En cours',
+                'bloqué', 'bloque'     => 'Bloqué',
+                'terminé', 'termine'   => 'Terminé',
+                default                => 'En attente',
+            };
+
             return [
                 'id'            => $item->id,
                 'immat'         => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
@@ -119,7 +99,7 @@ class ReceptionController extends Controller
                 'interventions' => array_values(array_filter($interventionsList)),
                 'rdv'           => (bool) ($item->is_rdv ?? false),
                 'heure'         => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
-                'statut'        => $item->statut,
+                'statut'        => $normalizedStatut,
                 'technicien'    => $item->technicien ? [
                     'id'   => $item->technicien->id,
                     'nom'  => $item->technicien->name,
@@ -132,10 +112,103 @@ class ReceptionController extends Controller
             ];
         });
 
-        $totalCount = $vehicules->count();
-        $enAttenteCount = $vehicules->filter(fn($v) => $v['statut'] === 'En attente')->count();
-        $enCoursCount = $vehicules->filter(fn($v) => in_array($v['statut'], ['En cours', 'Bloqué']))->count();
-        $terminesCount = $vehicules->filter(fn($v) => $v['statut'] === 'Terminé')->count();
+        return response()->json([
+            'status'       => 'success',
+            'tickets'      => $tickets,
+            'vehicules'    => $tickets,
+            'data'         => $tickets,
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+            'per_page'     => $paginator->perPage(),
+            'total'        => $paginator->total(),
+            'pagination'   => [
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Obtenir la file d'attente complète & le suivi temps réel pour le module Réception avec pagination.
+     * GET /api/reception/file-attente
+     */
+    public function getFileAttente(Request $request): JsonResponse
+    {
+        $perPage    = (int) $request->query('per_page', 10);
+        $page       = (int) $request->query('page', 1);
+        $activeOnly = filter_var($request->query('active_only', false), FILTER_VALIDATE_BOOLEAN);
+
+        // ── Statuts inclus dans la liste paginée ────────────────────────────────
+        $activeStatuts = ['en cours', 'en_cours', 'en attente', 'en_attente', 'bloqué', 'bloque'];
+        $allStatuts    = array_merge($activeStatuts, ['terminé', 'termine']);
+
+        $statuts = $activeOnly ? $activeStatuts : $allStatuts;
+
+        // ── Requête principale (paginée) ─────────────────────────────────────────
+        $query = Intervention::with(['vehicule.prestations', 'technicien', 'pont'])
+            ->whereDate('created_at', Carbon::today())
+            ->whereIn(DB::raw('LOWER(statut)'), $statuts)
+            ->orderByRaw("CASE
+                WHEN LOWER(statut) IN ('en cours', 'en_cours') THEN 1
+                WHEN LOWER(statut) IN ('bloqué', 'bloque')    THEN 2
+                WHEN LOWER(statut) IN ('en attente', 'en_attente') THEN 3
+                ELSE 4 END")
+            ->orderByRaw("COALESCE(is_rdv, 0) DESC")
+            ->orderBy('created_at', 'asc');
+
+        // ── Compteurs KPIs (toujours sur l'ensemble du jour courant) ──
+        $enAttenteCount = Intervention::whereDate('created_at', Carbon::today())
+            ->whereIn(DB::raw('LOWER(statut)'), ['en attente', 'en_attente'])
+            ->count();
+        $enCoursCount   = Intervention::whereDate('created_at', Carbon::today())
+            ->whereIn(DB::raw('LOWER(statut)'), ['en cours', 'en_cours', 'bloqué', 'bloque'])
+            ->count();
+        $terminesCount  = Intervention::whereDate('created_at', Carbon::today())
+            ->whereIn(DB::raw('LOWER(statut)'), ['terminé', 'termine'])
+            ->count();
+        $totalCount     = $enAttenteCount + $enCoursCount + $terminesCount;
+
+        // ── Pagination ───────────────────────────────────────────────────────────
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+
+        $vehicules = collect($paginator->items())->map(function ($item) {
+            $interventionsList = $item->vehicule && $item->vehicule->prestations->isNotEmpty()
+                ? $item->vehicule->prestations->pluck('nom')->toArray()
+                : (explode(', ', $item->type_intervention ?? ''));
+
+            $nomVehicule = $item->vehicule 
+                ? trim("{$item->vehicule->marque} {$item->vehicule->modele}")
+                : 'Inconnu';
+
+            $rawStatut = $item->statut ?? 'En attente';
+            $normalizedStatut = match(strtolower($rawStatut)) {
+                'en cours', 'en_cours' => 'En cours',
+                'bloqué', 'bloque'     => 'Bloqué',
+                'terminé', 'termine'   => 'Terminé',
+                default                => 'En attente',
+            };
+
+            return [
+                'id'            => $item->id,
+                'immat'         => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
+                'marque'        => $nomVehicule,
+                'interventions' => array_values(array_filter($interventionsList)),
+                'rdv'           => (bool) ($item->is_rdv ?? false),
+                'heure'         => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
+                'statut'        => $normalizedStatut,
+                'technicien'    => $item->technicien ? [
+                    'id'   => $item->technicien->id,
+                    'nom'  => $item->technicien->name,
+                    'name' => $item->technicien->name,
+                ] : null,
+                'pont'          => $item->pont ? [
+                    'id'  => $item->pont->id,
+                    'nom' => $item->pont->nom,
+                ] : null,
+            ];
+        });
 
         return response()->json([
             'status' => 'success',
@@ -145,7 +218,19 @@ class ReceptionController extends Controller
                 'en_cours'   => $enCoursCount,
                 'termines'   => $terminesCount,
             ],
-            'vehicules' => $vehicules,
+            'vehicules'    => $vehicules,
+            'tickets'      => $vehicules,
+            'data'         => $vehicules,
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+            'per_page'     => $paginator->perPage(),
+            'total'        => $paginator->total(),
+            'pagination'   => [
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+            ],
         ]);
     }
 

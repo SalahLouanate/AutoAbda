@@ -59,6 +59,7 @@ export default function TechnicienDashboardView() {
   const [tasks, setTasks] = useState([])
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -112,75 +113,72 @@ export default function TechnicienDashboardView() {
     }
   }
 
-  // Hook principal : Récupération initiale + Écoute WebSocket temps réel sur 'atelier' et 'garage'
+  // Hook principal : Récupération initiale au montage + Écoute WebSockets nettoyée ([] strictement constant)
   useEffect(() => {
     fetchCurrentTask()
     fetchHistory()
 
     const echoInstance = echo || window.Echo
 
-    if (echoInstance) {
-      const atelierChannel = echoInstance.channel('atelier')
-      const garageChannel = echoInstance.channel('garage')
+    if (!echoInstance) return
 
-      const handleWebSocketEvent = (e) => {
-        console.log('⚡ Événement temps réel reçu:', e)
+    const atelierChannel = echoInstance.channel('atelier')
+    const garageChannel = echoInstance.channel('garage')
+
+    let wsTimer = null
+    const handleWebSocketEvent = (e) => {
+      if (wsTimer) clearTimeout(wsTimer)
+      wsTimer = setTimeout(() => {
         fetchCurrentTask()
         fetchHistory()
-      }
+      }, 500)
+    }
 
-      const handleTicketCreated = (e) => {
-        console.log('⚡ Événement TicketCreated reçu sur garage:', e)
-        const assignedTechId = e?.technicien_id || e?.technicien?.id || e?.ticket?.technicien_id || e?.intervention?.user_id
-        // Si le ticket est attribué à ce technicien ou non-spécifié, on rafraîchit la liste des tâches
-        if (!assignedTechId || String(assignedTechId) === String(currentUser?.id)) {
-          fetchCurrentTask()
-          fetchHistory()
-        }
-      }
+    const handleTicketCreated = (e) => {
+      handleWebSocketEvent(e)
+    }
 
-      const handleTicketDeleted = (e) => {
-        console.log('⚡ Événement TicketDeleted reçu sur TechnicienDashboardView:', e)
-        const deletedId = e?.ticket_id || e?.id
-        if (deletedId) {
-          setTasks((prevTasks) => prevTasks.filter((t) => String(t.id) !== String(deletedId)))
-        }
-      }
-
-      atelierChannel.listen('.InterventionStatusChanged', handleWebSocketEvent)
-      atelierChannel.listen('InterventionStatusChanged', handleWebSocketEvent)
-      atelierChannel.listen('.intervention.updated', handleWebSocketEvent)
-      atelierChannel.listen('intervention.updated', handleWebSocketEvent)
-      atelierChannel.listen('.TicketDeleted', handleTicketDeleted)
-      atelierChannel.listen('TicketDeleted', handleTicketDeleted)
-
-      garageChannel.listen('.TicketCreated', handleTicketCreated)
-      garageChannel.listen('TicketCreated', handleTicketCreated)
-      garageChannel.listen('.TicketStatusUpdated', handleWebSocketEvent)
-      garageChannel.listen('TicketStatusUpdated', handleWebSocketEvent)
-      garageChannel.listen('.TicketDeleted', handleTicketDeleted)
-      garageChannel.listen('TicketDeleted', handleTicketDeleted)
-
-      return () => {
-        atelierChannel.stopListening('.InterventionStatusChanged')
-        atelierChannel.stopListening('InterventionStatusChanged')
-        atelierChannel.stopListening('.intervention.updated')
-        atelierChannel.stopListening('intervention.updated')
-        atelierChannel.stopListening('.TicketDeleted')
-        atelierChannel.stopListening('TicketDeleted')
-
-        garageChannel.stopListening('.TicketCreated')
-        garageChannel.stopListening('TicketCreated')
-        garageChannel.stopListening('.TicketStatusUpdated')
-        garageChannel.stopListening('TicketStatusUpdated')
-        garageChannel.stopListening('.TicketDeleted')
-        garageChannel.stopListening('TicketDeleted')
-
-        echoInstance.leaveChannel('atelier')
-        echoInstance.leaveChannel('garage')
+    const handleTicketDeleted = (e) => {
+      const deletedId = e?.ticket_id || e?.id
+      if (deletedId) {
+        setTasks((prevTasks) => prevTasks.filter((t) => String(t.id) !== String(deletedId)))
       }
     }
-  }, [currentUser?.id])
+
+    atelierChannel.listen('.InterventionStatusChanged', handleWebSocketEvent)
+    atelierChannel.listen('InterventionStatusChanged', handleWebSocketEvent)
+    atelierChannel.listen('.intervention.updated', handleWebSocketEvent)
+    atelierChannel.listen('intervention.updated', handleWebSocketEvent)
+    atelierChannel.listen('.TicketDeleted', handleTicketDeleted)
+    atelierChannel.listen('TicketDeleted', handleTicketDeleted)
+
+    garageChannel.listen('.TicketCreated', handleTicketCreated)
+    garageChannel.listen('TicketCreated', handleTicketCreated)
+    garageChannel.listen('.TicketStatusUpdated', handleWebSocketEvent)
+    garageChannel.listen('TicketStatusUpdated', handleWebSocketEvent)
+    garageChannel.listen('.TicketDeleted', handleTicketDeleted)
+    garageChannel.listen('TicketDeleted', handleTicketDeleted)
+
+    return () => {
+      if (wsTimer) clearTimeout(wsTimer)
+      atelierChannel.stopListening('.InterventionStatusChanged')
+      atelierChannel.stopListening('InterventionStatusChanged')
+      atelierChannel.stopListening('.intervention.updated')
+      atelierChannel.stopListening('intervention.updated')
+      atelierChannel.stopListening('.TicketDeleted')
+      atelierChannel.stopListening('TicketDeleted')
+
+      garageChannel.stopListening('.TicketCreated')
+      garageChannel.stopListening('TicketCreated')
+      garageChannel.stopListening('.TicketStatusUpdated')
+      garageChannel.stopListening('TicketStatusUpdated')
+      garageChannel.stopListening('.TicketDeleted')
+      garageChannel.stopListening('TicketDeleted')
+
+      echoInstance.leaveChannel('atelier')
+      echoInstance.leaveChannel('garage')
+    }
+  }, []) // 👈 Strictement constant []
 
   // Charger l'historique au changement d'onglet vers 'bilan'
   useEffect(() => {
@@ -192,10 +190,12 @@ export default function TechnicienDashboardView() {
   // ⏱️ CHRONOMÈTRE RESISTANT A LA MISE EN VEILLE (SUR LA TÂCHE ACTIVE)
   useEffect(() => {
     let interval = null
-    if (activeTask && activeTask.statut === 'En cours') {
+    const isEnCours = activeTask?.statut === 'En cours'
+    const dateDebut = activeTask?.date_debut
+
+    if (isEnCours && dateDebut) {
       const calculateSeconds = () => {
-        if (!activeTask.date_debut) return 0
-        const startTime = new Date(activeTask.date_debut).getTime()
+        const startTime = new Date(dateDebut).getTime()
         const now = Date.now()
         return Math.max(0, Math.floor((now - startTime) / 1000))
       }
@@ -211,51 +211,71 @@ export default function TechnicienDashboardView() {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [activeTask])
+  }, [activeTask?.id, activeTask?.statut, activeTask?.date_debut])
 
-  // 3. Action API : Démarrer / Reprendre l'intervention active
+  // 3. Action API : Démarrer / Reprendre l'intervention (Instantané et Sécurisé)
   const handleStart = async (targetId = activeTask?.id) => {
-    if (!targetId) return
+    if (!targetId || actionLoading) return
     try {
-      setLoading(true)
-      await api.post(`/technicien/tache/${targetId}/start`)
-      await fetchCurrentTask()
+      setActionLoading(true)
+      const res = await api.post(`/technicien/tache/${targetId}/start`)
+      if (res.data?.intervention) {
+        const updated = res.data.intervention
+        setTasks((prevTasks) =>
+          prevTasks.map((t) => (String(t.id) === String(targetId) ? { ...t, ...updated } : t))
+        )
+      } else {
+        fetchCurrentTask()
+      }
     } catch (err) {
       console.error('Erreur lors du démarrage:', err)
       alert(err.response?.data?.message || 'Impossible de démarrer l\'intervention.')
-      setLoading(false)
+    } finally {
+      setActionLoading(false)
     }
   }
 
-  // 4. Action API : Signaler un blocage (Statut 'Bloqué')
+  // 4. Action API : Signaler un blocage (Instantané et Sécurisé)
   const handleBlock = async (motif) => {
-    if (!activeTask) return
+    if (!activeTask || actionLoading) return
+    const targetId = activeTask.id
     const finalMotif = motif || customMotif || 'Problème technique / En attente'
     try {
-      setLoading(true)
-      await api.post(`/technicien/tache/${activeTask.id}/block`, { motif: finalMotif })
+      setActionLoading(true)
       setModalProblemOpen(false)
       setCustomMotif('')
-      await fetchCurrentTask()
+      const res = await api.post(`/technicien/tache/${targetId}/block`, { motif: finalMotif })
+      if (res.data?.intervention) {
+        const updated = res.data.intervention
+        setTasks((prevTasks) =>
+          prevTasks.map((t) => (String(t.id) === String(targetId) ? { ...t, ...updated } : t))
+        )
+      } else {
+        fetchCurrentTask()
+      }
     } catch (err) {
       console.error('Erreur lors du signalement de blocage:', err)
       alert(err.response?.data?.message || 'Impossible de marquer l\'intervention comme bloquée.')
-      setLoading(false)
+    } finally {
+      setActionLoading(false)
     }
   }
 
-  // 5. Action API : Terminer l'intervention active
+  // 5. Action API : Terminer l'intervention active (Instantané et Sécurisé)
   const handleFinish = async () => {
-    if (!activeTask) return
+    if (!activeTask || actionLoading) return
+    const targetId = activeTask.id
+    const finishedTask = activeTask
     try {
-      setLoading(true)
-      await api.post(`/technicien/tache/${activeTask.id}/finish`)
-      await fetchCurrentTask()
-      await fetchHistory()
+      setActionLoading(true)
+      await api.post(`/technicien/tache/${targetId}/finish`)
+      setTasks((prevTasks) => prevTasks.filter((t) => String(t.id) !== String(targetId)))
+      setHistory((prevHistory) => [{ ...finishedTask, statut: 'Terminé', date_fin: new Date().toISOString() }, ...prevHistory])
     } catch (err) {
       console.error('Erreur lors de la clôture:', err)
       alert(err.response?.data?.message || 'Impossible de terminer l\'intervention.')
-      setLoading(false)
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -458,11 +478,11 @@ export default function TechnicienDashboardView() {
                   {activeTask.statut === 'En attente' && (
                     <button
                       onClick={() => handleStart(activeTask.id)}
-                      disabled={loading}
-                      className="w-full h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      disabled={actionLoading}
+                      className="w-full h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <Play className="w-5 h-5 fill-current" />
-                      <span>Démarrer l'intervention</span>
+                      <span>{actionLoading ? 'Démarrage...' : 'Démarrer l\'intervention'}</span>
                     </button>
                   )}
 
@@ -470,16 +490,17 @@ export default function TechnicienDashboardView() {
                     <div className="flex flex-col gap-2 pt-1">
                       <button
                         onClick={handleFinish}
-                        disabled={loading}
-                        className="w-full h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        disabled={actionLoading}
+                        className="w-full h-14 text-base font-black bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                       >
                         <CheckCircle2 className="w-5 h-5" />
-                        <span>Terminer l'intervention</span>
+                        <span>{actionLoading ? 'Clôture en cours...' : 'Terminer l\'intervention'}</span>
                       </button>
 
                       <button
                         onClick={() => setModalProblemOpen(true)}
-                        className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        disabled={actionLoading}
+                        className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                       >
                         <PauseCircle className="w-4 h-4 text-red-500" />
                         <span>Signaler un blocage</span>
@@ -491,20 +512,20 @@ export default function TechnicienDashboardView() {
                     <div className="flex flex-col gap-2 pt-1">
                       <button
                         onClick={() => handleStart(activeTask.id)}
-                        disabled={loading}
-                        className="w-full h-14 text-base font-black bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        disabled={actionLoading}
+                        className="w-full h-14 text-base font-black bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                       >
                         <Play className="w-5 h-5 fill-current" />
-                        <span>Reprendre l'intervention</span>
+                        <span>{actionLoading ? 'Reprise en cours...' : 'Reprendre l\'intervention'}</span>
                       </button>
 
                       <button
                         onClick={handleFinish}
-                        disabled={loading}
-                        className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        disabled={actionLoading}
+                        className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                       >
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Terminer l'intervention</span>
+                        <span>{actionLoading ? 'Clôture en cours...' : 'Terminer l\'intervention'}</span>
                       </button>
                     </div>
                   )}

@@ -132,8 +132,8 @@ const BarTooltip = memo(function BarTooltip({ active, payload, label }) {
 const ChargeBarChart = memo(function ChargeBarChart({ chargeTravail }) {
   const data = useMemo(() => (chargeTravail || []).map(item => ({
     nom: item.technicien ? item.technicien.split(' ')[0] : 'Tech',
-    'Barème': item.bareme || 60,
-    'Passé': item.temps_passe || 0,
+    'Temps Barémé': item.temps_bareme ?? item.bareme ?? item.duree_estimee ?? 0,
+    'Temps Passé': item.temps_passe ?? 0,
   })), [chargeTravail])
 
   return (
@@ -143,17 +143,17 @@ const ChargeBarChart = memo(function ChargeBarChart({ chargeTravail }) {
         <p className="text-xs text-slate-400 mt-0.5">Temps barémé vs. temps passé (min) — interventions en cours</p>
       </div>
       <ResponsiveContainer width="100%" height={160}>
-        <BarChart data={data.length > 0 ? data : [{ nom: 'Aucun', Barème: 0, Passé: 0 }]} barCategoryGap="35%" barGap={3}>
+        <BarChart data={data.length > 0 ? data : [{ nom: 'Aucun', 'Temps Barémé': 0, 'Temps Passé': 0 }]} barCategoryGap="35%" barGap={3}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
           <XAxis dataKey="nom" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={30} tickFormatter={v => `${v}'`} />
           <Tooltip content={<BarTooltip />} cursor={{ fill: '#f8fafc' }} />
-          <Bar dataKey="Barème" fill="#bfdbfe" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="Passé"  fill="#3b82f6" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="Temps Barémé" fill="#bfdbfe" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="Temps Passé"  fill="#3b82f6" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
       <div className="flex items-center gap-4 mt-3">
-        <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-200 inline-block"/>Barème (réf 60')</span>
+        <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-200 inline-block"/>Temps Barémé</span>
         <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-500 inline-block"/>Temps passé</span>
       </div>
     </div>
@@ -167,15 +167,39 @@ const PontCard = memo(function PontCard({ pont }) {
   const statutUpper = pont.statut ? pont.statut.toUpperCase() : 'LIBRE'
   const isMaintenance = statutUpper === 'MAINTENANCE'
   const isLibre = statutUpper === 'LIBRE'
-  const isRetard = statutUpper === 'EN_RETARD'
 
   const technicien = pont.technicien_assigne || 'Technicien non assigné'
   const intervention = pont.intervention
   const vehiculeLabel = intervention?.vehicule || 'Véhicule N/A'
   const interventionType = intervention?.type_intervention || 'Intervention'
 
-  const tempsPasse = intervention?.temps_passe ?? 0
-  const tempsBareme = intervention?.bareme ?? 60
+  const tempsBareme = intervention?.bareme ?? intervention?.temps_bareme_total ?? 60
+
+  // ── Calcul dynamique du temps passé depuis started_at ─────────────────────
+  const calcTemps = () => {
+    const startedAt = intervention?.started_at || intervention?.date_debut || null
+    if (!startedAt) return intervention?.temps_passe ?? 0
+    const debut = new Date(startedAt)
+    if (isNaN(debut.getTime())) return intervention?.temps_passe ?? 0
+    return Math.max(0, Math.round((Date.now() - debut.getTime()) / 60000))
+  }
+
+  const [tempsPasse, setTempsPasse] = useState(calcTemps)
+
+  useEffect(() => {
+    const startedAt = intervention?.started_at || intervention?.date_debut || null
+    if (!startedAt || isLibre || isMaintenance) return
+
+    // Rafraîchissement toutes les 30 secondes (précis sans surcharger)
+    const timer = setInterval(() => {
+      setTempsPasse(calcTemps())
+    }, 30000)
+
+    return () => clearInterval(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intervention?.started_at, intervention?.date_debut, isLibre, isMaintenance])
+
+  const isRetard = !isLibre && !isMaintenance && tempsBareme > 0 && tempsPasse > tempsBareme
   const pct = tempsBareme > 0 ? Math.min(100, Math.round((tempsPasse / tempsBareme) * 100)) : 0
 
   if (isMaintenance) {

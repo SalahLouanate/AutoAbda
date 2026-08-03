@@ -71,7 +71,7 @@ class DirectionController extends Controller
         }, 'interventions' => function ($query) {
             $query->whereDate('created_at', \Carbon\Carbon::today())
                 ->whereIn('statut', ['En cours', 'Bloqué'])
-                ->with(['vehicule', 'user']);
+                ->with(['vehicule.prestations', 'user']);
         }])->orderBy('id')->get();
 
         $totalPonts = $ponts->count() > 0 ? $ponts->count() : 5;
@@ -96,7 +96,7 @@ class DirectionController extends Controller
             if ($isMaintenance) {
                 $statutPont = 'MAINTENANCE';
             } elseif ($activeIntervention) {
-                $bareme = $this->getBareme($activeIntervention->type_intervention);
+                $bareme = (int) ($activeIntervention->temps_bareme_total ?? 60);
                 $dateDebut = $activeIntervention->date_debut ? Carbon::parse($activeIntervention->date_debut) : Carbon::now();
                 $tempsPasse = max(0, (int) round(Carbon::now()->diffInMinutes($dateDebut)));
 
@@ -113,6 +113,7 @@ class DirectionController extends Controller
                     'type_intervention' => $activeIntervention->type_intervention,
                     'temps_passe' => $tempsPasse,
                     'bareme' => $bareme,
+                    'temps_bareme' => $bareme,
                     'statut_intervention' => $activeIntervention->statut,
                     'motif_blocage' => $activeIntervention->motif_blocage,
                 ];
@@ -120,6 +121,7 @@ class DirectionController extends Controller
                 $chargeTravail[] = [
                     'technicien' => $technicienAssigne ?? ('Technicien ' . $pont->id),
                     'bareme' => $bareme,
+                    'temps_bareme' => $bareme,
                     'temps_passe' => $tempsPasse,
                     'vehicule' => $vehiculeName,
                     'pont' => $pont->nom,
@@ -359,8 +361,8 @@ class DirectionController extends Controller
             // Calcul de la prime selon le $rate dynamique fourni (ex: 35 MAD/h)
             $primeMontant = $heuresGagnees > 0 ? round($heuresGagnees * $rate, 2) : 0;
 
-            // Taux d'efficacité individuel
-            $tauxEfficacite = $tempsPasseH > 0 ? round(($tempsBaremeH / $tempsPasseH) * 100, 1) : 100.0;
+            // Taux d'efficacité individuel (si le temps passé est de 0, l'efficacité retourne 0)
+            $tauxEfficacite = $tempsPasseH > 0 ? round(($tempsBaremeH / $tempsPasseH) * 100, 1) : 0.0;
 
             $chiffreAffairesTotal += $caTech;
             $tempsBaremeGlobalMin += $baremeMinSum;
@@ -392,7 +394,7 @@ class DirectionController extends Controller
 
         $tauxEfficaciteGlobal = $tempsPasseGlobalH > 0 
             ? round(($tempsBaremeGlobalH / $tempsPasseGlobalH) * 100, 1) 
-            : 100.0;
+            : 0.0;
 
         return response()->json([
             'message' => 'Bilan et calcul des primes générés avec succès.',

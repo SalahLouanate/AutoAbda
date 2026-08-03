@@ -46,43 +46,45 @@ function RdvStatusBadge({ rdv }) {
 }
 
 // ─── Badge de Statut Avancement ────────────────────────────────────────────────
+// ─── Badge de Statut Avancement (Couleurs douces et texte lisible) ──────────────
 function StatutBadge({ statut }) {
-  if (statut === 'En cours') {
+  const st = String(statut || '').toLowerCase()
+  if (st === 'en cours' || st === 'en_cours') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200 shrink-0 shadow-2xs">
         <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
         En cours
       </span>
     )
   }
-  if (statut === 'Bloqué') {
+  if (st === 'bloqué' || st === 'bloque') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-200 shrink-0 shadow-2xs">
         <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
         Bloqué
       </span>
     )
   }
-  if (statut === 'Terminé') {
+  if (st === 'terminé' || st === 'termine') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0 shadow-2xs">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
         Terminé
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200 shrink-0 shadow-2xs">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
       En attente
     </span>
   )
 }
 
-// ─── Badge de Prestation (Anti-débordement avec max-w-full truncate) ────────────
+// ─── Badge de Prestation (wrap-friendly, no truncate conflict) ────────────────
 function InterventionPill({ label }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100/80 truncate max-w-full shrink-0">
+    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100 whitespace-normal break-words leading-snug">
       {label}
     </span>
   )
@@ -91,6 +93,8 @@ function InterventionPill({ label }) {
 // ─── Ligne Véhicule en Attente (Grid 12, Data Binding Dynamique Strict) ─────────
 function TicketRow({ ticket, index, onDelete, onPrint }) {
   const isFirst = index === 0
+  const isEnAttente = ticket.statut === 'En attente' || ticket.statut === 'en_attente'
+  const isPriorityBadgeVisible = isFirst && isEnAttente
   const orderNum = index + 1
 
   // Extraction dynamique de la plaque d'immatriculation
@@ -121,17 +125,17 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
 
   return (
     <li
-      className={`grid grid-cols-12 gap-4 items-center px-5 py-5 h-auto transition-colors group ${
-        isFirst
-          ? 'bg-emerald-50/50 hover:bg-emerald-50/80 border-l-4 border-emerald-600 shadow-sm'
-          : 'hover:bg-slate-50/90'
+      className={`grid grid-cols-12 gap-x-4 gap-y-2 items-center px-5 py-4 transition-all duration-200 group border-b border-slate-100/80 ${
+        isPriorityBadgeVisible
+          ? 'bg-emerald-50/60 hover:bg-emerald-50/90 border-l-4 border-l-emerald-600'
+          : 'hover:bg-slate-50/80'
       }`}
     >
-      {/* Col 1 (col-span-1) : Numéro d'ordre + Pastille */}
-      <div className="col-span-1 min-w-0 flex items-center gap-2">
+      {/* Col 1 (col-span-1) : Numéro d'ordre */}
+      <div className="col-span-1 flex items-center justify-center">
         <span
           className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
-            isFirst
+            isPriorityBadgeVisible
               ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600/20'
               : 'bg-slate-100 text-slate-600'
           }`}
@@ -145,10 +149,10 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
         <LicensePlate immat={immatDisplay} />
       </div>
 
-      {/* Col 3 (col-span-2) : Véhicule & Heure (Variables dynamiques) */}
-      <div className="col-span-2 min-w-0 flex flex-col justify-center gap-1">
-        {isFirst && (
-          <span className="inline-flex items-center gap-1 bg-emerald-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse w-fit shadow-sm">
+      {/* Col 3 (col-span-3) : Véhicule & Heure */}
+      <div className="col-span-3 min-w-0 flex flex-col justify-center gap-0.5">
+        {isPriorityBadgeVisible && (
+          <span className="inline-flex items-center gap-1 bg-emerald-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse w-fit shadow-sm mb-0.5">
             <span>⚡</span>
             <span>Au tour de ce client</span>
           </span>
@@ -159,39 +163,45 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
 
       {/* Col 4 (col-span-2) : Technicien */}
       <div className="col-span-2 min-w-0">
-        <div className="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 max-w-full">
+        <div className="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 max-w-full overflow-hidden">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-blue-600 shrink-0">
             <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm-2 5V6a2 2 0 114 0v1H8z" clipRule="evenodd" />
           </svg>
           <span className="font-medium text-slate-500 truncate">
-            Tech : <strong className="text-slate-900 font-bold">{techNom}</strong>
+            <strong className="text-slate-900 font-bold">{techNom}</strong>
           </span>
         </div>
       </div>
 
-      {/* Col 5 (col-span-3) : Interventions (Boucle sur les prestations dynamiques) */}
-      <div className="col-span-3 min-w-0 flex flex-wrap items-center gap-2">
-        {listPrestations.map((prestItem, idx) => (
-          <InterventionPill key={idx} label={prestItem} />
-        ))}
+      {/* Col 5 (col-span-2) : Prestations - flex-wrap pour les badges */}
+      <div className="col-span-2 min-w-0 flex flex-wrap items-start gap-1.5">
+        {listPrestations.length > 0
+          ? listPrestations.map((prestItem, idx) => (
+              <InterventionPill key={idx} label={prestItem} />
+            ))
+          : <span className="text-xs text-slate-400 italic">—</span>
+        }
       </div>
 
-      {/* Col 6 (col-span-2) : Statut & Actions alignés à droite */}
-      <div className="col-span-2 min-w-0 flex items-center justify-end gap-2">
-        <StatutBadge statut={ticket.statut} />
-        <RdvStatusBadge rdv={ticket.rdv} />
+      {/* Col 6 (col-span-2) : Badges Statut + RDV + Boutons actions, tout en colonne */}
+      <div className="col-span-2 min-w-0 flex flex-col items-end gap-1.5">
+        {/* Badges sur leur propre ligne, avec retour à la ligne possible */}
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <StatutBadge statut={ticket.statut} />
+          <RdvStatusBadge rdv={ticket.rdv} />
+        </div>
 
+        {/* Boutons d'action */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={() => onPrint(ticket)}
             title="Imprimer le ticket physique"
-            className="p-1.5 sm:px-2.5 py-1.5 rounded-lg text-slate-700 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition cursor-pointer"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-blue-600">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-blue-500">
               <path fillRule="evenodd" d="M7.875 1.5C6.839 1.5 6 2.34 6 3.375v2.99c-.426.053-.851.11-1.274.174-1.454.218-2.476 1.483-2.476 2.917v6.294a3 3 0 0 0 3 3h.27l-.155 1.705A1.875 1.875 0 0 0 7.232 22.5h9.536a1.875 1.875 0 0 0 1.867-2.045l-.155-1.705h.27a3 3 0 0 0 3-3V9.456c0-1.434-1.022-2.7-2.476-2.917A48.716 48.716 0 0 0 18 6.366V3.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM16.5 6.205v-2.83A.375.375 0 0 0 16.125 3h-8.25a.375.375 0 0 0-.375.375v2.83a49.353 49.353 0 0 1 9 0Zm-.217 8.265c.03.29.048.582.048.877a48.57 48.57 0 0 1-.31 5.48.75.75 0 0 1-.75.673H8.729a.75.75 0 0 1-.75-.673 48.57 48.57 0 0 1-.31-5.48c0-.295.018-.587.048-.877a49.788 49.788 0 0 0 8.556 0Zm-5.09 3.485a.75.75 0 0 1 .75-.75h.75a.75.75 0 0 1 0 1.5h-.75a.75.75 0 0 1-.75-.75Zm2.25 1.5a.75.75 0 0 0 0 1.5h.75a.75.75 0 0 0 0-1.5h-.75Z" clipRule="evenodd" />
             </svg>
-            <span className="hidden sm:inline">Imprimer</span>
           </button>
 
           <button
@@ -651,13 +661,71 @@ function CreateTicketModal({
   )
 }
 
+// ─── Composant de Pagination Dynamique ─────────────────────────────────────────
+function PaginationControls({ currentPage, lastPage, onPageChange }) {
+  if (!lastPage || lastPage <= 1) return null
+
+  const pages = []
+  for (let i = 1; i <= lastPage; i++) {
+    pages.push(i)
+  }
+
+  return (
+    <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-200/80 rounded-b-2xl shadow-xs mt-1">
+      <p className="text-xs font-semibold text-slate-500">
+        Page <span className="font-bold text-slate-900">{currentPage}</span> sur{' '}
+        <span className="font-bold text-slate-900">{lastPage}</span>
+      </p>
+
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
+        >
+          &larr; Précédent
+        </button>
+
+        <div className="hidden sm:flex items-center gap-1">
+          {pages.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPageChange(p)}
+              className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                p === currentPage
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= lastPage}
+          className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
+        >
+          Suivant &rarr;
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Composant Principal : DashboardReception ──────────────────────────────────
 export default function DashboardReception() {
   const [catalogueOptions, setCatalogueOptions] = useState(DEFAULT_CATALOGUE_OPTIONS)
   const [techniciensDisponibles, setTechniciensDisponibles] = useState([])
   
-  // 1. Initialisation stricte des states à vide
+  // 1. Initialisation stricte des states à vide + Pagination
   const [vehicules, setVehicules] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [lastPage, setLastPage] = useState(1)
   const [kpis, setKpis] = useState({
     total: 0,
     en_attente: 0,
@@ -665,7 +733,7 @@ export default function DashboardReception() {
     termines: 0,
   })
 
-  // Onglet de filtrage côté client ('Tous', 'En attente', 'En cours', 'Terminés')
+  // Onglet de filtrage côté client ('Tous', 'En attente', 'En cours')
   const [filterTab, setFilterTab] = useState('Tous')
   const [sortBy, setSortBy] = useState('rdv')
 
@@ -690,17 +758,23 @@ export default function DashboardReception() {
     }
   }
 
-  // 3. AXIOS : GET /api/reception/file-attente et remplissage des states
-  const fetchFileAttente = useCallback(async (silent = false) => {
+  // 3. AXIOS : GET /api/reception/file-attente (tickets actifs uniquement — Prise en Charge)
+  const fetchFileAttente = useCallback(async (silent = false, page = 1) => {
     try {
-      const res = await api.get('/reception/file-attente')
+      const res = await api.get(`/reception/file-attente?active_only=true&page=${page}`)
       if (res.data) {
         if (Array.isArray(res.data.vehicules)) {
           setVehicules(res.data.vehicules)
+        } else if (Array.isArray(res.data.data)) {
+          setVehicules(res.data.data)
         }
         if (res.data.kpis) {
           setKpis(res.data.kpis)
         }
+        const cp = res.data.current_page || res.data.pagination?.current_page || page
+        const lp = res.data.last_page || res.data.pagination?.last_page || 1
+        setCurrentPage(cp)
+        setLastPage(lp)
       }
     } catch (err) {
       console.error('Erreur chargement file d\'attente:', err)
@@ -845,9 +919,9 @@ export default function DashboardReception() {
 
   // 2. Boucle de filtrage côté client pour les onglets
   const vehiculesFiltres = sortedVehicules.filter((v) => {
-    if (filterTab === 'En attente') return v.statut === 'En attente'
-    if (filterTab === 'En cours') return v.statut === 'En cours' || v.statut === 'Bloqué'
-    if (filterTab === 'Terminés') return v.statut === 'Terminé'
+    const st = String(v.statut || '').toLowerCase()
+    if (filterTab === 'En attente') return st === 'en attente' || st === 'en_attente'
+    if (filterTab === 'En cours') return st === 'en cours' || st === 'en_cours' || st === 'bloqué' || st === 'bloque'
     return true // 'Tous'
   })
 
@@ -914,7 +988,6 @@ export default function DashboardReception() {
               { id: 'Tous', label: 'Tous', count: kpis.total },
               { id: 'En attente', label: 'En attente', count: kpis.en_attente },
               { id: 'En cours', label: 'En cours', count: kpis.en_cours },
-              { id: 'Terminés', label: 'Terminés', count: kpis.termines },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -976,17 +1049,25 @@ export default function DashboardReception() {
           </div>
         ) : (
           /* 2. Map sur vehiculesFiltres */
-          <ul className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100 overflow-hidden w-full">
-            {vehiculesFiltres.map((ticket, index) => (
-              <TicketRow
-                key={ticket.id}
-                ticket={ticket}
-                index={index}
-                onDelete={handleDelete}
-                onPrint={triggerPrintTicket}
-              />
-            ))}
-          </ul>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden w-full">
+            <ul className="divide-y divide-gray-100 w-full">
+              {vehiculesFiltres.map((ticket, index) => (
+                <TicketRow
+                  key={ticket.id}
+                  ticket={ticket}
+                  index={index}
+                  onDelete={handleDelete}
+                  onPrint={triggerPrintTicket}
+                />
+              ))}
+            </ul>
+
+            <PaginationControls
+              currentPage={currentPage}
+              lastPage={lastPage}
+              onPageChange={(p) => fetchFileAttente(false, p)}
+            />
+          </div>
         )}
       </div>
 
