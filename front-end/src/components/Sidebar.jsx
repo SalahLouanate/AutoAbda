@@ -69,11 +69,11 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
   }
 
   const renderContent = (isDrawer = false) => (
-    <aside className={`fixed top-0 left-0 h-screen w-64 bg-slate-900 flex flex-col border-r border-slate-700/50 ${
+    <aside className={`fixed top-0 left-0 h-[100dvh] w-64 bg-slate-900 flex flex-col border-r border-slat-700/50 ${
       isDrawer ? 'z-50' : 'hidden lg:flex z-40'
     }`}>
       {/* Logo & Brand */}
-      <div className="px-5 py-5 border-b border-slate-700/50 flex items-center justify-between">
+      <div className="px-5 py-5 border-b border-slate-700/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-400/20">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-slate-900">
@@ -101,7 +101,7 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       </div>
 
       {/* Navigation items SPA */}
-      <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-5 min-h-0 flex flex-col gap-1 overflow-y-auto">
         <p className="text-slate-600 text-xs font-semibold uppercase tracking-widest px-3 mb-3">
           Module Direction
         </p>
@@ -133,7 +133,7 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       </nav>
 
       {/* Profile & Logout */}
-      <div className="px-4 py-4 border-t border-slate-700/50 flex flex-col gap-3">
+      <div className="px-4 py-4 border-t border-slate-700/50 flex flex-col gap-3 shrink-0">
         <NavLink
           to="/direction/profil"
           onClick={handleNavClick}

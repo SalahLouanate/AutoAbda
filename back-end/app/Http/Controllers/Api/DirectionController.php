@@ -324,6 +324,10 @@ class DirectionController extends Controller
 
         $performancesTechniciens = [];
 
+        // Taux de prime fixe : 20 DH par heure de temps barème dépassant le seuil
+        $PRIME_TAUX    = 20;   // MAD/heure
+        $SEUIL_JOUR_H  = 8;    // heures de seuil journalier
+
         foreach ($techniciens as $tech) {
             $techInterventions = $interventionsCloturees->where('user_id', $tech->id);
 
@@ -353,20 +357,40 @@ class DirectionController extends Controller
             }
 
             $tempsBaremeH = round($baremeMinSum / 60, 2);
-            $tempsPasseH = round($tempsPasseMinSum / 60, 2);
+            $tempsPasseH  = round($tempsPasseMinSum / 60, 2);
 
             $heuresGagnees = round($tempsBaremeH - $tempsPasseH, 2);
             $heuresPerdues = $heuresGagnees < 0 ? abs($heuresGagnees) : 0;
 
-            // Calcul de la prime selon le $rate dynamique fourni (ex: 35 MAD/h)
-            $primeMontant = $heuresGagnees > 0 ? round($heuresGagnees * $rate, 2) : 0;
+            // ─── Nouvelle logique de prime : 20 DH/h sur le temps barème dépassant le seuil ───
+            //
+            // Mode JOUR   → seuil = 8 h fixe
+            // Mode MOIS   → seuil = 8 h × nombre de jours distincts travaillés par ce technicien
+            //               (on compte les jours où la date_fin est renseignée, i.e. interventions clôturées)
+            if ($isTodayMode) {
+                $seuilH = $SEUIL_JOUR_H;
+            } else {
+                // Nombre de jours calendaires distincts sur lesquels le technicien a clôturé au moins une intervention
+                $joursDistincts = $techInterventions
+                    ->filter(fn($i) => !is_null($i->date_fin))
+                    ->map(fn($i) => Carbon::parse($i->date_fin)->toDateString())
+                    ->unique()
+                    ->count();
+
+                // Fallback : si aucun jour n'est détectable, on utilise 1 jour pour éviter un seuil nul
+                $seuilH = $SEUIL_JOUR_H * max(1, $joursDistincts);
+            }
+
+            $heuresAuDessus = max(0, round($tempsBaremeH - $seuilH, 4));
+            $primeMontant   = round($heuresAuDessus * $PRIME_TAUX, 2);
+            // ──────────────────────────────────────────────────────────────────────────────────
 
             // Taux d'efficacité individuel (si le temps passé est de 0, l'efficacité retourne 0)
             $tauxEfficacite = $tempsPasseH > 0 ? round(($tempsBaremeH / $tempsPasseH) * 100, 1) : 0.0;
 
-            $chiffreAffairesTotal += $caTech;
-            $tempsBaremeGlobalMin += $baremeMinSum;
-            $tempsPasseGlobalMin += $tempsPasseMinSum;
+            $chiffreAffairesTotal  += $caTech;
+            $tempsBaremeGlobalMin  += $baremeMinSum;
+            $tempsPasseGlobalMin   += $tempsPasseMinSum;
             $totalPrimesDistribuees += $primeMontant;
 
             $performancesTechniciens[] = [
@@ -381,6 +405,8 @@ class DirectionController extends Controller
                 'heures_gagnees'          => max(0, $heuresGagnees),
                 'heures_perdues'          => $heuresPerdues,
                 'taux_efficacite'         => $tauxEfficacite,
+                'seuil_heures'            => $seuilH,
+                'heures_au_dessus_seuil'  => $heuresAuDessus,
                 'prime_montant'           => $primeMontant,
                 'prime_formatted'         => number_format($primeMontant, 2, ',', ' ') . ' MAD',
                 'ca_genere'               => $caTech,

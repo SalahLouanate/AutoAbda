@@ -67,7 +67,7 @@ class RessourceController extends Controller
             'name'       => 'required|string|max:255',
             'email'      => 'required|email|unique:users,email',
             'password'   => 'nullable|string|min:6',
-            'role'       => 'required|string|in:direction,chef_atelier,technicien',
+            'role'       => 'required|string|in:direction,chef_atelier,technicien,reception,receptionniste,admin,magasinier',
             'telephone'  => 'nullable|string|max:50',
             'specialite' => 'nullable|string|max:255',
             'pont_id'    => 'nullable|exists:ponts,id',
@@ -98,7 +98,7 @@ class RessourceController extends Controller
             'name'       => 'sometimes|required|string|max:255',
             'email'      => 'sometimes|required|email|unique:users,email,' . $user->id,
             'password'   => 'nullable|string|min:6',
-            'role'       => 'sometimes|required|string|in:direction,chef_atelier,technicien',
+            'role'       => 'sometimes|required|string|in:direction,chef_atelier,technicien,reception,receptionniste,admin,magasinier',
             'telephone'  => 'nullable|string|max:50',
             'specialite' => 'nullable|string|max:255',
             'pont_id'    => 'nullable|exists:ponts,id',
@@ -131,30 +131,22 @@ class RessourceController extends Controller
     }
 
     /**
-     * Supprime / Désactive un membre du personnel et libère son pont.
+     * Supprime un membre du personnel et libère son pont le cas échéant.
      */
     public function destroyPersonnel($id): JsonResponse
     {
         $user = User::findOrFail($id);
-        $oldPontId = $user->pont_id;
 
-        // Libération du pont et passage du statut à inactif
-        $user->update([
-            'pont_id'   => null,
-            'is_active' => false,
-        ]);
-
-        if ($oldPontId) {
-            Pont::where('id', $oldPontId)->update(['statut' => 'Libre']);
+        if ($user->pont_id) {
+            Pont::where('id', $user->pont_id)->update(['statut' => 'Libre']);
         }
 
         $user->delete();
 
         return response()->json([
-            'message' => 'Membre du personnel supprimé et pont libéré avec succès.',
+            'message' => 'Membre du personnel supprimé avec succès.',
         ], 200);
     }
-
 
     // =========================================================================
     // 2. GESTION DES INFRASTRUCTURES (PONTS DE L'ATELIER)
@@ -202,11 +194,15 @@ class RessourceController extends Controller
     }
 
     /**
-     * Récupère la liste des ponts actuellement libres.
+     * Récupère la liste des ponts actuellement disponibles (libres et non en maintenance).
      */
     public function indexPontsLibres(Request $request): JsonResponse
     {
-        $ponts = Pont::where('statut', 'Libre')->orderBy('id')->get();
+        // Récupère dynamiquement tous les ponts existants qui ne sont pas en maintenance
+        $ponts = Pont::where(function ($query) {
+            $query->whereNotIn('statut', ['Maintenance', 'En maintenance', 'maintenance'])
+                  ->orWhereNull('statut');
+        })->orderBy('id')->get();
 
         return response()->json([
             'message' => 'Liste des ponts libres récupérée avec succès.',
@@ -226,7 +222,6 @@ class RessourceController extends Controller
             'statut' => 'required|string|in:Libre,Occupé,Maintenance,En maintenance',
         ]);
 
-        // Standardisation
         $statutNormalise = strtolower($validated['statut']) === 'en maintenance' ? 'Maintenance' : ucfirst($validated['statut']);
 
         $pont->update(['statut' => $statutNormalise]);

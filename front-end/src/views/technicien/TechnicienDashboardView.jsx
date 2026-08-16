@@ -464,7 +464,7 @@ export default function TechnicienDashboardView() {
 
                   {/* Chronomètre visuel si 'En cours' */}
                   {activeTask.statut === 'En cours' && (
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-center">
+                    <div className="hidden bg-slate-50 rounded-2xl p-4 border border-slate-200 text-center">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center justify-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-blue-500" /> Temps d'intervention
                       </p>
