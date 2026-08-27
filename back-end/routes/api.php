@@ -30,6 +30,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
     Route::get('/direction/dashboard', [DirectionController::class, 'dashboard']);
     Route::get('/direction/supervision', [DirectionController::class, 'supervision']);
+    Route::post('/direction/interventions/{id}/annuler', [DirectionController::class, 'annulerIntervention']);
     Route::get('/direction/bilan', [DirectionController::class, 'bilanMensuel']);
     Route::get('/direction/bilan-mensuel', [DirectionController::class, 'bilanMensuel']);
 
@@ -48,7 +49,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/ponts/{id}', [RessourceController::class, 'updatePontStatus']);
     });
 
-    // Catalogue & Barèmes CRUD
+    // Catalogue & Barèmes CRUD (Direction & Réception)
     Route::get('/direction/catalogue', [CatalogueController::class, 'index']);
     Route::post('/direction/catalogue', [CatalogueController::class, 'store']);
     Route::put('/direction/catalogue/{id}', [CatalogueController::class, 'update']);
@@ -65,7 +66,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);
     Route::delete('/tickets/{id}', [ReceptionController::class, 'destroyTicket']);
     Route::prefix('reception')->group(function () {
-        Route::get('/catalogue', [ReceptionController::class, 'getInterventions']);
+        Route::get('/catalogue', [CatalogueController::class, 'index']);
+        Route::post('/catalogue', [CatalogueController::class, 'store']);
+        Route::put('/catalogue/{id}', [CatalogueController::class, 'update']);
+        Route::delete('/catalogue/{id}', [CatalogueController::class, 'destroy']);
         Route::get('/interventions', [ReceptionController::class, 'getInterventions']);
         Route::get('/tickets', [ReceptionController::class, 'getTickets']);
         Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);

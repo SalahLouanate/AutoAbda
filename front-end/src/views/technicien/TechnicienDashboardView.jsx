@@ -145,12 +145,25 @@ export default function TechnicienDashboardView() {
       }
     }
 
+    // Gestion de l'annulation d'une intervention par la Supervision
+    const handleInterventionAnnulee = (e) => {
+      const annuleeId = e?.intervention_id || e?.id
+      if (annuleeId) {
+        setTasks((prevTasks) => prevTasks.filter((t) => String(t.id) !== String(annuleeId)))
+      }
+      // Rafraîchissement complet (tâche courante + historique)
+      fetchCurrentTask()
+      fetchHistory()
+    }
+
     atelierChannel.listen('.InterventionStatusChanged', handleWebSocketEvent)
     atelierChannel.listen('InterventionStatusChanged', handleWebSocketEvent)
     atelierChannel.listen('.intervention.updated', handleWebSocketEvent)
     atelierChannel.listen('intervention.updated', handleWebSocketEvent)
     atelierChannel.listen('.TicketDeleted', handleTicketDeleted)
     atelierChannel.listen('TicketDeleted', handleTicketDeleted)
+    atelierChannel.listen('.InterventionAnnulee', handleInterventionAnnulee)
+    atelierChannel.listen('InterventionAnnulee', handleInterventionAnnulee)
 
     garageChannel.listen('.TicketCreated', handleTicketCreated)
     garageChannel.listen('TicketCreated', handleTicketCreated)
@@ -158,6 +171,8 @@ export default function TechnicienDashboardView() {
     garageChannel.listen('TicketStatusUpdated', handleWebSocketEvent)
     garageChannel.listen('.TicketDeleted', handleTicketDeleted)
     garageChannel.listen('TicketDeleted', handleTicketDeleted)
+    garageChannel.listen('.InterventionAnnulee', handleInterventionAnnulee)
+    garageChannel.listen('InterventionAnnulee', handleInterventionAnnulee)
 
     return () => {
       if (wsTimer) clearTimeout(wsTimer)
@@ -167,6 +182,8 @@ export default function TechnicienDashboardView() {
       atelierChannel.stopListening('intervention.updated')
       atelierChannel.stopListening('.TicketDeleted')
       atelierChannel.stopListening('TicketDeleted')
+      atelierChannel.stopListening('.InterventionAnnulee')
+      atelierChannel.stopListening('InterventionAnnulee')
 
       garageChannel.stopListening('.TicketCreated')
       garageChannel.stopListening('TicketCreated')
@@ -174,6 +191,8 @@ export default function TechnicienDashboardView() {
       garageChannel.stopListening('TicketStatusUpdated')
       garageChannel.stopListening('.TicketDeleted')
       garageChannel.stopListening('TicketDeleted')
+      garageChannel.stopListening('.InterventionAnnulee')
+      garageChannel.stopListening('InterventionAnnulee')
 
       echoInstance.leaveChannel('atelier')
       echoInstance.leaveChannel('garage')
@@ -437,42 +456,49 @@ export default function TechnicienDashboardView() {
                   {/* Plaque d'immatriculation GRAND FORMAT */}
                   <LicensePlate immat={activeTask.vehicule?.matricule} size="large" />
 
-                  {/* Détails du véhicule & intervention */}
-                  <div className="space-y-2 pt-1">
-                    <h2 className="text-xl font-black text-slate-800">
-                      {activeTask.vehicule ? `${activeTask.vehicule.marque} ${activeTask.vehicule.modele}` : 'Véhicule'}
-                    </h2>
+                  {/* Lecture stricte du booléen est_variable */}
+                  {(() => {
+                    const isVariable = Boolean(
+                      activeTask.est_variable === true ||
+                      (activeTask.catalogue && activeTask.catalogue.est_variable === true)
+                    )
 
-                    <div className="flex items-start gap-2 text-xs font-bold text-slate-700 pt-2 border-t border-slate-100">
-                      <Wrench className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                      <span>{activeTask.type_intervention}</span>
-                    </div>
+                    return (
+                      <>
+                        <h2 className="text-xl font-black text-slate-800">
+                          {activeTask.vehicule ? `${activeTask.vehicule.marque} ${activeTask.vehicule.modele}` : 'Véhicule'}
+                        </h2>
 
-                    {/* ALERTE BLOCAGE SI STATUT BLOQUÉ */}
-                    {activeTask.statut === 'Bloqué' && (
-                      <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-bold space-y-1 mt-2">
-                        <div className="flex items-center gap-1.5 text-red-700">
-                          <ShieldAlert className="w-4 h-4 shrink-0 text-red-600" />
-                          <span className="uppercase tracking-wider">Motif du blocage :</span>
+                        {/* Vue Technicien : Le barème et le temps passé sont MASQUÉS pour le technicien */}
+                        <div className="space-y-2 pt-1">
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-700 pt-2 border-t border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <Wrench className="w-4 h-4 text-blue-600 shrink-0" />
+                              <span className="text-sm font-bold text-slate-800">{activeTask.type_intervention}</span>
+                            </div>
+                            {isVariable && (
+                              <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                                Durée variable
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-slate-800 font-semibold pl-5">
-                          {activeTask.motif_blocage || 'En attente de pièces / validation'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Chronomètre visuel si 'En cours' */}
-                  {activeTask.statut === 'En cours' && (
-                    <div className="hidden bg-slate-50 rounded-2xl p-4 border border-slate-200 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 flex items-center justify-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-blue-500" /> Temps d'intervention
-                      </p>
-                      <div className="text-4xl font-extrabold font-mono text-slate-800 tracking-wider">
-                        {formatChrono(seconds)}
-                      </div>
-                    </div>
-                  )}
+                        {/* ALERTE BLOCAGE SI STATUT BLOQUÉ */}
+                        {activeTask.statut === 'Bloqué' && (
+                          <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-bold space-y-1 mt-2">
+                            <div className="flex items-center gap-1.5 text-red-700">
+                              <ShieldAlert className="w-4 h-4 shrink-0 text-red-600" />
+                              <span className="uppercase tracking-wider">Motif du blocage :</span>
+                            </div>
+                            <p className="text-slate-800 font-semibold pl-5">
+                              {activeTask.motif_blocage || 'En attente de pièces / validation'}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
 
                   {/* LOGIQUE DES BOUTONS */}
                   {activeTask.statut === 'En attente' && (

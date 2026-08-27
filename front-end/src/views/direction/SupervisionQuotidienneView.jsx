@@ -18,6 +18,8 @@ export default function SupervisionQuotidienneView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [technicienActifId, setTechnicienActifId] = useState(null)
+  const [showBlockModal, setShowBlockModal] = useState(false)
+  const [cancelingId, setCancelingId] = useState(null)
 
   // Chronomètre temps réel : rafraîchissement dynamique des temps passés toutes les 10 secondes
   const [nowTick, setNowTick] = useState(Date.now())
@@ -29,6 +31,34 @@ export default function SupervisionQuotidienneView() {
 
     return () => clearInterval(timer)
   }, [])
+
+  // Fonction d'annulation d'une intervention avec règles métier
+  const handleCancelIntervention = async (intervention) => {
+    // Règle 1 : Si 'En cours', on bloque et on affiche le modal
+    if (intervention.statut === 'En cours') {
+      setShowBlockModal(true)
+      return
+    }
+
+    // Règle 2 : Si 'En attente' ou 'Terminé', on lance la requête API
+    try {
+      setCancelingId(intervention.id)
+      await api.post(`/direction/interventions/${intervention.id}/annuler`)
+
+      // Suppression instantanée du state local (pas de rechargement de page)
+      setInterventionsList(prev => prev.filter(i => i.id !== intervention.id))
+    } catch (err) {
+      console.error('Erreur lors de l\'annulation:', err)
+      // Si le backend retourne 403 (sécurité double), on affiche le modal
+      if (err.response?.status === 403) {
+        setShowBlockModal(true)
+      } else {
+        alert(err.response?.data?.message || 'Erreur lors de l\'annulation.')
+      }
+    } finally {
+      setCancelingId(null)
+    }
+  }
 
   // 2. Appel API vers /api/direction/supervision avec transmission du filtre date
   const fetchSupervisionData = async (silent = false) => {
@@ -129,8 +159,15 @@ export default function SupervisionQuotidienneView() {
       }
     }
 
-    // Récupération dynamique du barème réel et calcul live du temps passé (Date.now() - started_at)
-    const baremeMin = item.temps_bareme_total ?? item.bareme ?? 60
+    // Strict lecture du booléen est_variable renvoyé par l'API Backend
+    const isVariable = Boolean(
+      item.est_variable === true ||
+      (item.catalogue && item.catalogue.est_variable === true) ||
+      (item.vehicule?.prestations && item.vehicule.prestations.some((p) => p.est_variable === true))
+    )
+
+    const baremeMinutesOfficiel = item.temps_bareme_officiel ?? item.catalogue?.temps_bareme ?? (item.temps_bareme_total ?? item.bareme ?? 60)
+    const baremeMin = isVariable ? 0 : baremeMinutesOfficiel
     const dateDebutISO = item.started_at || item.date_debut
 
     let tempsPasseMin = item.temps_passe || 0
@@ -154,10 +191,13 @@ export default function SupervisionQuotidienneView() {
       statut: item.statut,
       motifBlocage: item.motif_blocage,
       tempsBareme: tempsBaremeH,
+      tempsBaremeOfficiel: item.temps_bareme_officiel ?? item.catalogue?.temps_bareme,
+      catalogue: item.catalogue,
       tempsPasse: tempsPasseH,
       startedAt: dateDebutISO,
       baremeMin: baremeMin,
       tempsPasseMin: tempsPasseMin,
+      estVariable: isVariable,
       heureArrivee: item.heure_arrivee,
       pontNom: item.pont?.nom || 'Non affecté',
     })
@@ -546,8 +586,14 @@ export default function SupervisionQuotidienneView() {
                 ) : (
                   <div className="space-y-4">
                     {technicienActif.interventions.map((intervention) => {
-                      const isDepasse = intervention.tempsPasse > intervention.tempsBareme
-                      const pourcent = Math.min(
+                      const isVariable = Boolean(
+                        intervention.estVariable === true ||
+                        intervention.est_variable === true ||
+                        (intervention.catalogue && intervention.catalogue.est_variable === true)
+                      )
+
+                      const isDepasse = !isVariable && intervention.tempsPasse > intervention.tempsBareme
+                      const pourcent = isVariable ? 0 : Math.min(
                         Math.round((intervention.tempsPasse / (intervention.tempsBareme || 1)) * 100),
                         100
                       )
@@ -594,6 +640,13 @@ export default function SupervisionQuotidienneView() {
                         barColorClass = 'bg-blue-500'
                       }
 
+                      // 🛑 ÉTAPE 2 : DEBUGGING IMPOSÉ DANS LA CONSOLE REACT
+                      console.log(`DEBUG INTERVENTION ${intervention.id} (${intervention.type}) :`, { 
+                        donnee_brute: intervention, 
+                        valeur_est_variable: intervention.est_variable ?? intervention.estVariable,
+                        catalogue: intervention.catalogue 
+                      });
+
                       return (
                         <div
                           key={intervention.id}
@@ -627,34 +680,61 @@ export default function SupervisionQuotidienneView() {
                             </div>
                           )}
 
-                          {/* La Barre de Progression */}
-                          <div className="space-y-1.5 pt-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-semibold text-slate-700">
-                                Temps passé : {formaterTemps(intervention.tempsPasse)} / Barème : {formaterTemps(intervention.tempsBareme)}
+                          {/* La Barre de Progression / Rendu Blindé */}
+                          {isVariable ? (
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-700 pt-1">
+                              <span>
+                                Temps passé : <strong className="text-slate-900 font-mono font-bold">{formaterTemps(intervention.tempsPasse)}</strong> / Barème : <span className="text-blue-600 font-extrabold">Temps réel (Indéfini)</span>
                               </span>
-                              {isDepasse ? (
-                                <span className="font-bold text-rose-600 flex items-center gap-1">
-                                  <span>+ {formaterTemps(intervention.tempsPasse - intervention.tempsBareme)}</span>
-                                  <span className="text-[10px] uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-black">
-                                    Retard
-                                  </span>
+                              <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                                Durée variable
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-semibold text-slate-700">
+                                  Temps passé : {formaterTemps(intervention.tempsPasse)} / Barème : {formaterTemps(intervention.tempsBaremeOfficiel ? (intervention.tempsBaremeOfficiel / 60) : intervention.tempsBareme)}
                                 </span>
-                              ) : (
-                                <span className="text-slate-400 font-medium">{pourcent}%</span>
-                              )}
-                            </div>
+                                {isDepasse ? (
+                                  <span className="font-bold text-rose-600 flex items-center gap-1">
+                                    <span>+ {formaterTemps(intervention.tempsPasse - intervention.tempsBareme)}</span>
+                                    <span className="text-[10px] uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-black">
+                                      Retard
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-medium">{pourcent}%</span>
+                                )}
+                              </div>
 
-                            {/* Container Barre */}
-                            <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${barColorClass}`}
-                                style={{
-                                  width: `${Math.min(pourcent, 100)}%`,
-                                }}
-                              />
+                              {/* Container Barre */}
+                              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${barColorClass}`}
+                                  style={{
+                                    width: `${Math.min(pourcent, 100)}%`,
+                                  }}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
+
+                          {/* Bouton Annuler l'intervention */}
+                          {(intervention.statut === 'En attente' || intervention.statut === 'Terminé' || intervention.statut === 'En cours') && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <button
+                                onClick={() => handleCancelIntervention(intervention)}
+                                disabled={cancelingId === intervention.id}
+                                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 hover:border-red-300 active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                                {cancelingId === intervention.id ? 'Annulation...' : 'Annuler cette intervention'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -668,6 +748,53 @@ export default function SupervisionQuotidienneView() {
               Tour de Contrôle Chef d'Atelier • Temps réel API
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* ── MODAL DE BLOCAGE : Intervention en cours ── */}
+      {showBlockModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          {/* Overlay sombre */}
+          <div
+            onClick={() => setShowBlockModal(false)}
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-200"
+          />
+
+          {/* Contenu du Modal */}
+          <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-0 overflow-hidden animate-[scaleIn_0.2s_ease-out]">
+            {/* Barre supérieure rouge */}
+            <div className="h-1.5 bg-gradient-to-r from-red-500 via-rose-500 to-orange-500" />
+
+            <div className="p-6 space-y-4">
+              {/* Icône d'alerte */}
+              <div className="flex items-center justify-center">
+                <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-200 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Titre */}
+              <h3 className="text-lg font-bold text-slate-800 text-center">
+                Action impossible
+              </h3>
+
+              {/* Message */}
+              <p className="text-sm text-slate-600 text-center leading-relaxed">
+                Cette intervention est <span className="font-bold text-blue-700">actuellement en cours</span>.
+                Le technicien doit d'abord <span className="font-semibold">la terminer</span> ou <span className="font-semibold">la bloquer</span> avant qu'elle puisse être annulée.
+              </p>
+
+              {/* Bouton Fermer */}
+              <button
+                onClick={() => setShowBlockModal(false)}
+                className="w-full mt-2 px-4 py-3 rounded-xl text-sm font-bold text-white bg-slate-800 hover:bg-slate-700 active:scale-[0.98] transition-all duration-200 cursor-pointer shadow-sm"
+              >
+                Compris, fermer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

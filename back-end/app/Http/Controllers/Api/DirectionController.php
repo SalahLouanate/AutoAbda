@@ -96,11 +96,12 @@ class DirectionController extends Controller
             if ($isMaintenance) {
                 $statutPont = 'MAINTENANCE';
             } elseif ($activeIntervention) {
-                $bareme = (int) ($activeIntervention->temps_bareme_total ?? 60);
+                $isVar = (bool) $activeIntervention->est_variable;
+                $bareme = $isVar ? 0 : (int) ($activeIntervention->temps_bareme_total ?? 60);
                 $dateDebut = $activeIntervention->date_debut ? Carbon::parse($activeIntervention->date_debut) : Carbon::now();
                 $tempsPasse = max(0, (int) round(Carbon::now()->diffInMinutes($dateDebut)));
 
-                $statutPont = ($tempsPasse > $bareme) ? 'EN_RETARD' : 'EN_COURS';
+                $statutPont = (!$isVar && $bareme > 0 && $tempsPasse > $bareme) ? 'EN_RETARD' : 'EN_COURS';
 
                 $vehiculeName = $activeIntervention->vehicule 
                     ? ($activeIntervention->vehicule->marque . ' ' . $activeIntervention->vehicule->modele)
@@ -111,6 +112,7 @@ class DirectionController extends Controller
                     'vehicule' => $vehiculeName,
                     'matricule' => $activeIntervention->vehicule?->matricule ?? null,
                     'type_intervention' => $activeIntervention->type_intervention,
+                    'est_variable' => $isVar,
                     'temps_passe' => $tempsPasse,
                     'bareme' => $bareme,
                     'temps_bareme' => $bareme,
@@ -125,6 +127,7 @@ class DirectionController extends Controller
                     'temps_passe' => $tempsPasse,
                     'vehicule' => $vehiculeName,
                     'pont' => $pont->nom,
+                    'est_variable' => $isVar,
                 ];
             }
 
@@ -196,10 +199,12 @@ class DirectionController extends Controller
         }
 
         // 🛑 Filtrage strict des présences : uniquement les techniciens actifs (is_active = true)
+        // 🛑 Exclusion des interventions annulées pour garder la supervision propre
         $interventions = Intervention::whereHas('user', function ($query) {
                 $query->where('is_active', true);
             })
-            ->with(['vehicule', 'user', 'pont'])
+            ->with(['vehicule.prestations', 'user', 'pont'])
+            ->where('statut', '!=', 'annule')
             ->where(function ($query) use ($targetDate) {
                 $query->whereDate('created_at', $targetDate)
                     ->orWhereDate('date_debut', $targetDate)
@@ -211,7 +216,11 @@ class DirectionController extends Controller
 
         $payload = $interventions->map(function ($item) {
             $item->loadMissing('vehicule.prestations');
-            $bareme = $item->temps_bareme_total;
+            $cataloguePrestation = $item->catalogue;
+
+            // 🛑 VERROUILLAGE ABSOLU DE LA DONNÉE : Typage booléen strict
+            $isVariable = (bool) ($item->est_variable ?? ($cataloguePrestation->est_variable ?? false));
+            $bareme = $isVariable ? 0 : (int) $item->temps_bareme_total;
             
             $tempsPasse = 0;
             if ($item->date_debut) {
@@ -219,27 +228,44 @@ class DirectionController extends Controller
                 $tempsPasse = max(0, (int) round(Carbon::parse($item->date_debut)->diffInMinutes($endDate)));
             }
 
-            $estEnRetard = ($item->statut === 'En cours') && ($tempsPasse > $bareme);
+            $estEnRetard = !$isVariable && ($item->statut === 'En cours') && ($tempsPasse > $bareme);
+
+            $tempsBaremeOfficiel = $cataloguePrestation ? (int) $cataloguePrestation->temps_bareme : (int) $bareme;
 
             return [
-                'id'                 => $item->id,
-                'statut'             => $item->statut,
-                'type_intervention'  => $item->type_intervention,
-                'motif_blocage'      => $item->motif_blocage,
-                'heure_arrivee'      => $item->created_at ? $item->created_at->format('H:i') : null,
-                'date_debut'         => $item->date_debut ? $item->date_debut->toIso8601String() : null,
-                'started_at'         => $item->date_debut ? $item->date_debut->toIso8601String() : null,
-                'date_fin'           => $item->date_fin ? $item->date_fin->toIso8601String() : null,
-                'bareme'             => $bareme,
-                'temps_bareme_total' => $bareme,
-                'temps_passe'        => $tempsPasse,
-                'est_en_retard'      => $estEnRetard,
+                'id'                    => $item->id,
+                'statut'                => $item->statut,
+                'type_intervention'     => $item->type_intervention,
+                'est_variable'          => (bool) $isVariable,
+                'temps_bareme_officiel' => $tempsBaremeOfficiel,
+                'catalogue'             => $cataloguePrestation ? [
+                    'id'           => $cataloguePrestation->id,
+                    'nom'          => $cataloguePrestation->nom,
+                    'temps_bareme' => (int) $cataloguePrestation->temps_bareme,
+                    'est_variable' => (bool) $cataloguePrestation->est_variable,
+                ] : null,
+                'motif_blocage'         => $item->motif_blocage,
+                'heure_arrivee'         => $item->created_at ? $item->created_at->format('H:i') : null,
+                'date_debut'            => $item->date_debut ? $item->date_debut->toIso8601String() : null,
+                'started_at'            => $item->date_debut ? $item->date_debut->toIso8601String() : null,
+                'date_fin'              => $item->date_fin ? $item->date_fin->toIso8601String() : null,
+                'bareme'                => $bareme,
+                'temps_bareme_total'    => $bareme,
+                'temps_passe'           => $tempsPasse,
+                'est_en_retard'         => $estEnRetard,
                 'vehicule'           => $item->vehicule ? [
                     'id'          => $item->vehicule->id,
                     'matricule'   => $item->vehicule->matricule,
                     'marque'      => $item->vehicule->marque,
                     'modele'      => $item->vehicule->modele,
                     'nom_complet' => $item->vehicule->marque . ' ' . $item->vehicule->modele,
+                    'prestations' => $item->vehicule->prestations->map(function ($p) {
+                        return [
+                            'id'           => $p->id,
+                            'nom'          => $p->nom,
+                            'est_variable' => (bool) $p->est_variable,
+                        ];
+                    }),
                 ] : null,
                 'client'             => [
                     'nom'       => $item->vehicule?->client_nom ?? 'Client Particulier',
@@ -262,6 +288,52 @@ class DirectionController extends Controller
             'date_observee' => $targetDate->format('Y-m-d'),
             'count'         => $payload->count(),
             'interventions' => $payload,
+        ], 200);
+    }
+
+    /**
+     * Annuler une intervention depuis la Supervision Quotidienne.
+     * Règles métier :
+     *   - Interdit si statut === 'En cours' → 403
+     *   - Autorisé uniquement si statut === 'En attente' ou 'Terminé'
+     * POST /api/direction/interventions/{id}/annuler
+     */
+    public function annulerIntervention($id): JsonResponse
+    {
+        $intervention = Intervention::find($id);
+
+        if (!$intervention) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Intervention introuvable.',
+            ], 404);
+        }
+
+        // 🛑 Sécurité bloquante : impossible d'annuler une intervention en cours
+        if ($intervention->statut === 'En cours') {
+            return response()->json([
+                'status'  => 'error',
+                'message' => "Impossible d'annuler une intervention en cours. Le technicien doit d'abord la terminer ou la bloquer.",
+            ], 403);
+        }
+
+        // Seules les interventions 'En attente' ou 'Terminé' peuvent être annulées
+        if (!in_array($intervention->statut, ['En attente', 'Terminé'])) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => "Impossible d'annuler cette intervention (statut actuel : {$intervention->statut}).",
+            ], 422);
+        }
+
+        $intervention->update(['statut' => 'annule']);
+
+        // Diffusion temps réel via Laravel Reverb pour synchroniser Réception & Technicien
+        broadcast(new \App\Events\InterventionAnnulee((int) $intervention->id));
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Intervention annulée avec succès.',
+            'id'      => (int) $intervention->id,
         ], 200);
     }
 

@@ -22,7 +22,7 @@ class Intervention extends Model
         'date_fin',
     ];
 
-    protected $appends = ['started_at', 'temps_bareme_total'];
+    protected $appends = ['started_at', 'temps_bareme_total', 'est_variable'];
 
     protected function casts(): array
     {
@@ -34,7 +34,7 @@ class Intervention extends Model
     }
 
     /**
-     * Accessor pour started_at (alias de date_debut au format ISO string).
+     * Accessor pourstarted_at (alias de date_debut au format ISO string).
      */
     public function getStartedAtAttribute(): ?string
     {
@@ -66,6 +66,54 @@ class Intervention extends Model
         }
 
         return 60;
+    }
+
+    /**
+     * Accessor pour obtenir l'objet catalogue (prestation associée).
+     */
+    public function getCatalogueAttribute()
+    {
+        if ($this->relationLoaded('vehicule') && $this->vehicule && $this->vehicule->relationLoaded('prestations')) {
+            return $this->vehicule->prestations->first();
+        }
+
+        if ($this->type_intervention) {
+            $types = array_map('trim', explode(',', $this->type_intervention));
+            return Prestation::whereIn('nom', $types)->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * Accessor pour déterminer si l'intervention contient au moins une prestation à durée variable.
+     */
+    public function getEstVariableAttribute(): bool
+    {
+        if ($this->relationLoaded('vehicule') && $this->vehicule && $this->vehicule->relationLoaded('prestations')) {
+            $hasVar = $this->vehicule->prestations->contains(function ($p) {
+                return (bool) $p->est_variable === true;
+            });
+            if ($this->vehicule->prestations->count() > 0) {
+                return $hasVar;
+            }
+        }
+
+        if ($this->vehicule_id) {
+            $vehicule = $this->vehicule ?? Vehicule::with('prestations')->find($this->vehicule_id);
+            if ($vehicule && $vehicule->prestations && $vehicule->prestations->count() > 0) {
+                return $vehicule->prestations->contains(function ($p) {
+                    return (bool) $p->est_variable === true;
+                });
+            }
+        }
+
+        if ($this->type_intervention) {
+            $types = array_map('trim', explode(',', $this->type_intervention));
+            return Prestation::whereIn('nom', $types)->where('est_variable', true)->exists();
+        }
+
+        return false;
     }
 
     /**

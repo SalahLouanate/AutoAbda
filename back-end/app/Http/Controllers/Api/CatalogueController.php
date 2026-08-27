@@ -36,6 +36,7 @@ class CatalogueController extends Controller
                 'tarif'               => (float) $item->tarif,
                 'tarif_formatted'     => number_format($item->tarif, 2, ',', ' ') . ' MAD',
                 'description'         => $item->description,
+                'est_variable'        => (bool) $item->est_variable,
             ];
         });
 
@@ -60,10 +61,15 @@ class CatalogueController extends Controller
         $validated = $request->validate([
             'nom'          => 'required|string|max:255',
             'categorie'    => 'required|string|max:255',
-            'temps_bareme' => 'required|numeric|min:1',
+            'est_variable' => 'sometimes|boolean',
+            'temps_bareme' => 'required_unless:est_variable,true|nullable|numeric|min:0',
             'tarif'        => 'required|numeric|min:0',
             'description'  => 'nullable|string|max:1000',
         ]);
+
+        if (!empty($validated['est_variable'])) {
+            $validated['temps_bareme'] = $validated['temps_bareme'] ?? 0;
+        }
 
         $prestation = Prestation::create($validated);
 
@@ -83,10 +89,15 @@ class CatalogueController extends Controller
         $validated = $request->validate([
             'nom'          => 'sometimes|required|string|max:255',
             'categorie'    => 'sometimes|required|string|max:255',
-            'temps_bareme' => 'sometimes|required|numeric|min:1',
+            'est_variable' => 'sometimes|boolean',
+            'temps_bareme' => 'sometimes|nullable|numeric|min:0',
             'tarif'        => 'sometimes|required|numeric|min:0',
             'description'  => 'nullable|string|max:1000',
         ]);
+
+        if (array_key_exists('est_variable', $validated) && $validated['est_variable']) {
+            $validated['temps_bareme'] = $validated['temps_bareme'] ?? 0;
+        }
 
         $prestation->update($validated);
 

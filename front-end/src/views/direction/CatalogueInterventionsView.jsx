@@ -66,16 +66,18 @@ function IcoList() {
 function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
   const isEdit = Boolean(editTarget)
 
-  const [nom,   setNom]   = useState(editTarget?.nom   ?? '')
-  const [temps, setTemps] = useState(editTarget?.temps ?? '')
-  const [errors, setErrors] = useState({})
-  const [saving, setSaving] = useState(false)
+  const [nom,         setNom]         = useState(editTarget?.nom         ?? '')
+  const [temps,       setTemps]       = useState(editTarget?.temps       ?? '')
+  const [estVariable, setEstVariable] = useState(editTarget?.est_variable ?? false)
+  const [errors,      setErrors]      = useState({})
+  const [saving,      setSaving]      = useState(false)
 
   // Reset à chaque ouverture
   useMemo(() => {
     if (isOpen) {
-      setNom(editTarget?.nom   ?? '')
-      setTemps(editTarget?.temps ?? '')
+      setNom(editTarget?.nom         ?? '')
+      setTemps(editTarget?.temps     ?? '')
+      setEstVariable(editTarget?.est_variable ?? false)
       setErrors({})
       setSaving(false)
     }
@@ -85,8 +87,10 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
 
   function validate() {
     const e = {}
-    if (!nom.trim())                        e.nom   = 'Le nom est obligatoire.'
-    if (temps === '' || Number(temps) <= 0) e.temps = 'Le temps doit être supérieur à 0.'
+    if (!nom.trim()) e.nom = 'Le nom est obligatoire.'
+    if (!estVariable && (temps === '' || Number(temps) <= 0)) {
+      e.temps = 'Le temps doit être supérieur à 0.'
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -95,7 +99,11 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
     e.preventDefault()
     if (!validate()) return
     setSaving(true)
-    await onSave({ nom: nom.trim(), temps: parseFloat(Number(temps).toFixed(2)) })
+    await onSave({
+      nom: nom.trim(),
+      temps: estVariable ? 0 : parseFloat(Number(temps).toFixed(2)),
+      est_variable: estVariable,
+    })
     setSaving(false)
   }
 
@@ -143,7 +151,7 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
                 type="text"
                 value={nom}
                 onChange={e => { setNom(e.target.value); setErrors(v => ({ ...v, nom: '' })) }}
-                placeholder="Ex : Remplacement courroie de distribution"
+                placeholder="Ex : Diagnostic Électronique / Recherche de panne"
                 className={`w-full text-sm text-slate-700 bg-slate-50 border rounded-xl px-4 py-2.5
                   focus:outline-none focus:ring-2 focus:bg-white transition
                   ${errors.nom ? 'border-red-400 focus:ring-red-300' : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400'}`}
@@ -151,10 +159,28 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
               {errors.nom && <p className="text-xs text-red-500 mt-1">{errors.nom}</p>}
             </div>
 
+            {/* Case à cocher : Durée variable */}
+            <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="est_variable_check"
+                checked={estVariable}
+                onChange={e => {
+                  const isChecked = e.target.checked
+                  setEstVariable(isChecked)
+                  if (isChecked) setErrors(v => ({ ...v, temps: '' }))
+                }}
+                className="w-4 h-4 text-yellow-500 rounded focus:ring-yellow-400 border-slate-300 cursor-pointer"
+              />
+              <label htmlFor="est_variable_check" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                Durée variable (au temps passé)
+              </label>
+            </div>
+
             {/* Temps alloué */}
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                Temps alloué (Heures) <span className="text-red-500">*</span>
+                Temps alloué (Heures) {!estVariable && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
@@ -162,19 +188,23 @@ function InterventionModal({ isOpen, editTarget, onClose, onSave }) {
                 </div>
                 <input
                   type="number"
-                  value={temps}
+                  disabled={estVariable}
+                  value={estVariable ? '' : temps}
                   onChange={e => { setTemps(e.target.value); setErrors(v => ({ ...v, temps: '' })) }}
-                  placeholder="1.5"
+                  placeholder={estVariable ? 'Temps indéterminé (Variable)' : '1.5'}
                   step="0.1"
                   min="0.1"
                   className={`w-full text-sm text-slate-700 bg-slate-50 border rounded-xl pl-10 pr-4 py-2.5
                     focus:outline-none focus:ring-2 focus:bg-white transition
+                    ${estVariable ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}
                     ${errors.temps ? 'border-red-400 focus:ring-red-300' : 'border-slate-200 focus:ring-yellow-400 focus:border-yellow-400'}`}
                 />
               </div>
               {errors.temps
                 ? <p className="text-xs text-red-500 mt-1">{errors.temps}</p>
-                : <p className="text-xs text-slate-400 mt-1">Exemple : 0.5 = 30 min · 1.0 = 1h · 1.5 = 1h30</p>
+                : <p className="text-xs text-slate-400 mt-1">
+                    {estVariable ? 'Durée libre selon le temps réel passé par le technicien.' : 'Exemple : 0.5 = 30 min · 1.0 = 1h · 1.5 = 1h30'}
+                  </p>
               }
             </div>
           </div>
@@ -321,14 +351,15 @@ export default function CatalogueInterventionsView() {
   const openEdit   = (item) => { setEditTarget(item); setIsModalOpen(true) }
   const closeModal = () => setIsModalOpen(false)
 
-  const handleSave = async ({ nom, temps }) => {
-    const tempsBaremeMinutes = Math.max(1, Math.round(temps * 60))
+  const handleSave = async ({ nom, temps, est_variable }) => {
+    const tempsBaremeMinutes = est_variable ? 0 : Math.max(1, Math.round(temps * 60))
     try {
       if (editTarget) {
         // PUT /api/direction/catalogue/{id}
         await api.put(`/direction/catalogue/${editTarget.id}`, {
           nom,
           temps_bareme: tempsBaremeMinutes,
+          est_variable,
         })
       } else {
         // POST /api/direction/catalogue
@@ -338,6 +369,7 @@ export default function CatalogueInterventionsView() {
           temps_bareme: tempsBaremeMinutes,
           tarif: 350,
           description: 'Intervention catalogue',
+          est_variable,
         })
       }
       await fetchCatalogue()
@@ -362,7 +394,8 @@ export default function CatalogueInterventionsView() {
   }
 
   // ── Formatage du temps ────────────────────────────────────────────────────
-  const formatTemps = (h) => {
+  const formatTemps = (h, isVariable = false) => {
+    if (isVariable || !h || h <= 0) return 'Indéfinie'
     if (h < 1) return `${Math.round(h * 60)} min`
     const heures  = Math.floor(h)
     const minutes = Math.round((h - heures) * 60)
@@ -462,17 +495,31 @@ export default function CatalogueInterventionsView() {
                   </div>
 
                   {/* Nom */}
-                  <div className="col-span-6 min-w-0 pr-4">
+                  <div className="col-span-6 min-w-0 pr-4 flex items-center gap-2">
                     <p className="text-sm font-semibold text-slate-800 truncate">{item.nom}</p>
+                    {item.est_variable && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                        Durée variable
+                      </span>
+                    )}
                   </div>
 
                   {/* Temps */}
                   <div className="col-span-3 flex items-center justify-center gap-2">
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
-                      <IcoClock />
-                      {item.temps}h
-                    </span>
-                    <span className="text-xs text-slate-400 hidden lg:block">{formatTemps(item.temps)}</span>
+                    {item.est_variable || !item.temps || item.temps === 0 ? (
+                      <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold">
+                        <IcoClock />
+                        Indéfinie
+                      </span>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                          <IcoClock />
+                          {item.temps}h
+                        </span>
+                        <span className="text-xs text-slate-400 hidden lg:block">{formatTemps(item.temps)}</span>
+                      </>
+                    )}
                   </div>
 
                   {/* Actions */}

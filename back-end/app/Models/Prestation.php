@@ -16,6 +16,11 @@ class Prestation extends Model
         'temps_bareme',
         'tarif',
         'description',
+        'est_variable',
+    ];
+
+    protected $casts = [
+        'est_variable' => 'boolean',
     ];
 
     /**
