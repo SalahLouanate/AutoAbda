@@ -532,12 +532,34 @@ class DirectionController extends Controller
         }
 
         $tempsBaremeGlobalH = round($tempsBaremeGlobalMin / 60, 2);
-        $tempsPasseGlobalH = round($tempsPasseGlobalMin / 60, 2);
-        $tempsGagneGlobalH = max(0, round($tempsBaremeGlobalH - $tempsPasseGlobalH, 2));
+        $tempsPasseGlobalH  = round($tempsPasseGlobalMin / 60, 2);
+        $tempsGagneGlobalH  = max(0, round($tempsBaremeGlobalH - $tempsPasseGlobalH, 2));
 
-        $tauxEfficaciteGlobal = $tempsPasseGlobalH > 0 
-            ? round(($tempsBaremeGlobalH / $tempsPasseGlobalH) * 100, 1) 
-            : 0.0;
+        // ─── Calcul de l'Efficacité Globale (Bilan Mensuel) ───
+        // 1. Capacité théorique totale = (Nombre de techniciens) × (8 heures = 480 min) × (Nombre de jours travaillés dans le mois)
+        // 2. Temps de travail réel = Somme des durées de toutes les interventions terminées sur cette période ($tempsPasseGlobalMin)
+        // 3. Efficacité Globale (%) = (Temps de travail réel / Capacité théorique totale) × 100 (arrondi à l'entier le plus proche)
+        $nombreTechniciens = $techniciens->count();
+
+        if ($isTodayMode) {
+            $joursTravailles = 1;
+        } else {
+            $joursTravailles = $interventionsCloturees
+                ->filter(fn($i) => !is_null($i->date_fin))
+                ->map(fn($i) => Carbon::parse($i->date_fin)->toDateString())
+                ->unique()
+                ->count();
+            $joursTravailles = max(1, $joursTravailles);
+        }
+
+        // Capacité théorique en minutes : 8 heures/jour/technicien = 480 minutes/jour/technicien
+        $capaciteTheoriqueTotalMin = $nombreTechniciens * 480 * $joursTravailles;
+        $capaciteTheoriqueTotalH   = round($capaciteTheoriqueTotalMin / 60, 2);
+
+        // Calcul de l'efficacité globale (%) arrondie à l'entier le plus proche (ex: 85%)
+        $tauxEfficaciteGlobal = $capaciteTheoriqueTotalMin > 0
+            ? (int) round(($tempsPasseGlobalMin / $capaciteTheoriqueTotalMin) * 100)
+            : 0;
 
         return response()->json([
             'message' => 'Bilan et calcul des primes générés avec succès.',
@@ -554,6 +576,9 @@ class DirectionController extends Controller
                 'temps_bareme_total'         => $tempsBaremeGlobalH,
                 'temps_passe_total'          => $tempsPasseGlobalH,
                 'temps_gagne_total'          => $tempsGagneGlobalH,
+                'nombre_techniciens'         => $nombreTechniciens,
+                'jours_travailles'           => $joursTravailles,
+                'capacite_theorique_heures'  => $capaciteTheoriqueTotalH,
                 'taux_efficacite_global'     => $tauxEfficaciteGlobal,
                 'total_primes_distribuees'   => $totalPrimesDistribuees,
                 'total_primes_formatted'     => number_format($totalPrimesDistribuees, 2, ',', ' ') . ' MAD',

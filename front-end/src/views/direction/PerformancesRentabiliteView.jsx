@@ -169,7 +169,7 @@ export default function PerformancesRentabiliteView() {
   const totalAchetees   = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalFacturees  = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalPrime      = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
-  const tauxEfficacite  = useMemo(() => bilanData?.kpis_globaux?.taux_efficacite_global ?? (totalAchetees > 0 ? Math.round((totalAchetees / (totalFacturees || 1)) * 100) : 0), [bilanData, totalAchetees, totalFacturees])
+  const tauxEfficacite  = useMemo(() => Math.round(bilanData?.kpis_globaux?.taux_efficacite_global ?? 0), [bilanData])
   const totalBilanNet   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.bilanNet, 0).toFixed(2)), [donneesActuelles])
   const totalMalusSAV   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0).toFixed(2)), [donneesActuelles])
 
