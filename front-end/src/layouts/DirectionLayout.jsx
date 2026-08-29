@@ -7,10 +7,12 @@ import CatalogueInterventionsView  from '../views/direction/CatalogueInterventio
 import GestionRessourcesView       from '../views/direction/GestionRessourcesView'
 import PerformancesRentabiliteView from '../views/direction/PerformancesRentabiliteView'
 import MonProfilView               from '../views/direction/MonProfilView'
+import GestionInterventions        from '../views/direction/GestionInterventions'
 
 const PAGE_LABELS = {
   '/direction/dashboard': 'Dashboard Temps Réel',
   '/direction/supervision': 'Supervision Quotidienne',
+  '/direction/gestion-interventions': 'Gestion des Interventions',
   '/direction/catalogue': 'Catalogue & Barèmes',
   '/direction/bilan': 'Bilan Mensuel & Primes',
   '/direction/ressources': 'Gestion des Ressources',
@@ -58,6 +60,7 @@ export default function DirectionLayout() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<DashboardDirectionView />} />
             <Route path="supervision" element={<SupervisionQuotidienneView />} />
+            <Route path="gestion-interventions" element={<GestionInterventions />} />
             <Route path="catalogue" element={<CatalogueInterventionsView />} />
             <Route path="bilan" element={<PerformancesRentabiliteView />} />
             <Route path="ressources" element={<GestionRessourcesView />} />

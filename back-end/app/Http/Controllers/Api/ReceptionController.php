@@ -353,6 +353,28 @@ class ReceptionController extends Controller
         $marqueInput = trim($validated['marque']);
         $isRdv = (bool) ($validated['is_rdv'] ?? false);
 
+        // 🛑 SÉCURITÉ DOUBLE TICKET : Interdire la création si le véhicule possède une intervention active
+        $existingActiveIntervention = Intervention::whereHas('vehicule', function ($q) use ($matricule) {
+                $q->where('matricule', $matricule);
+            })
+            ->whereIn(DB::raw('LOWER(statut)'), [
+                'en attente', 'en_attente',
+                'en cours', 'en_cours',
+                'en pause', 'en_pause', 'pause',
+                'bloqué', 'bloque'
+            ])
+            ->first();
+
+        if ($existingActiveIntervention) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Impossible de créer le ticket : ce véhicule est déjà en attente ou en cours de traitement.',
+                'errors'  => [
+                    'immatriculation' => ['Impossible de créer le ticket : ce véhicule est déjà en attente ou en cours de traitement.'],
+                ],
+            ], 422);
+        }
+
         // Extraire la marque et le modèle sans texte ni modèle par défaut forcé
         $parts = explode(' ', $marqueInput, 2);
         $marque = $parts[0];

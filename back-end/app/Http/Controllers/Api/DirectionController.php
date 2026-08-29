@@ -338,6 +338,51 @@ class DirectionController extends Controller
     }
 
     /**
+     * Mettre à jour le statut d'une intervention (PATCH /api/direction/interventions/{id}/status)
+     */
+    public function updateStatus(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'statut' => 'required|string',
+        ]);
+
+        $intervention = Intervention::findOrFail($id);
+        $newStatut = $request->input('statut');
+        $statutLower = mb_strtolower($newStatut);
+
+        if (in_array($statutLower, ['en pause', 'pause', 'en_pause'])) {
+            $intervention->statut = 'En pause';
+            if (!$intervention->motif_blocage) {
+                $intervention->motif_blocage = 'Mise en pause par le chef d\'atelier';
+            }
+        } elseif (in_array($statutLower, ['en cours', 'en_cours'])) {
+            $intervention->statut = 'En cours';
+            $intervention->motif_blocage = null;
+        } elseif (in_array($statutLower, ['terminé', 'termine', 'terminee', 'terminée'])) {
+            $intervention->statut = 'Terminé';
+            if (!$intervention->date_fin) {
+                $intervention->date_fin = now();
+            }
+        } elseif (in_array($statutLower, ['annulé', 'annule', 'annulee', 'annulée'])) {
+            $intervention->statut = 'annule';
+        } else {
+            $intervention->statut = $newStatut;
+        }
+
+        $intervention->save();
+        $intervention->load(['vehicule:id,matricule,marque,modele', 'pont:id,nom,statut', 'user:id,name,email']);
+
+        broadcast(new \App\Events\InterventionStatusChanged($intervention));
+
+        return response()->json([
+            'status'       => 'success',
+            'message'      => 'Statut de l\'intervention mis à jour avec succès.',
+            'statut'       => $intervention->statut,
+            'intervention' => $intervention,
+        ], 200);
+    }
+
+    /**
      * API pour le Bilan & Calcul des Primes de Performance des Techniciens.
      * Filtre les techniciens pour ne calculer les primes que des techniciens actifs (is_active = true).
      */

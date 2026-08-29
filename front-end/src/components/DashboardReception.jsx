@@ -125,16 +125,15 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
 
   return (
     <li
-      className={`flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-x-4 sm:gap-y-2 items-start sm:items-center px-4 sm:px-5 py-4 transition-all duration-200 group border-b border-slate-100/80 ${
+      className={`flex flex-col gap-3 px-3 sm:px-5 py-4 transition-all duration-200 group border-b border-slate-100/80 ${
         isPriorityBadgeVisible
           ? 'bg-emerald-50/60 hover:bg-emerald-50/90 border-l-4 border-l-emerald-600'
           : 'hover:bg-slate-50/80'
       }`}
     >
-      {/* Container mobile / Desktop col 1 + 2 + 3 */}
-      <div className="w-full sm:w-auto flex items-center justify-between sm:contents">
-        {/* Col 1 (col-span-1) : Numéro d'ordre */}
-        <div className="sm:col-span-1 flex items-center justify-center">
+      {/* Ligne 1 : Numéro + Plaque + Boutons actions */}
+      <div className="flex items-center justify-between gap-2 w-full">
+        <div className="flex items-center gap-2 min-w-0">
           <span
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
               isPriorityBadgeVisible
@@ -144,20 +143,16 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
           >
             {orderNum}
           </span>
-        </div>
-
-        {/* Col 2 (col-span-2) : Plaque d'immatriculation */}
-        <div className="sm:col-span-2 min-w-0 flex items-center">
           <LicensePlate immat={immatDisplay} />
         </div>
 
-        {/* Action buttons (Visible en haut sur mobile uniquement) */}
-        <div className="flex sm:hidden items-center gap-1 shrink-0">
+        {/* Boutons d'action — toujours visibles à droite */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={() => onPrint(ticket)}
             title="Imprimer le ticket physique"
-            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-blue-500">
               <path fillRule="evenodd" d="M7.875 1.5C6.839 1.5 6 2.34 6 3.375v2.99c-.426.053-.851.11-1.274.174-1.454.218-2.476 1.483-2.476 2.917v6.294a3 3 0 0 0 3 3h.27l-.155 1.705A1.875 1.875 0 0 0 7.232 22.5h9.536a1.875 1.875 0 0 0 1.867-2.045l-.155-1.705h.27a3 3 0 0 0 3-3V9.456c0-1.434-1.022-2.7-2.476-2.917A48.716 48.716 0 0 0 18 6.366V3.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM16.5 6.205v-2.83A.375.375 0 0 0 16.125 3h-8.25a.375.375 0 0 0-.375.375v2.83a49.353 49.353 0 0 1 9 0Zm-.217 8.265c.03.29.048.582.048.877a48.57 48.57 0 0 1-.31 5.48.75.75 0 0 1-.75.673H8.729a.75.75 0 0 1-.75-.673 48.57 48.57 0 0 1-.31-5.48c0-.295.018-.587.048-.877a49.788 49.788 0 0 0 8.556 0Zm-5.09 3.485a.75.75 0 0 1 .75-.75h.75a.75.75 0 0 1 0 1.5h-.75a.75.75 0 0 1-.75-.75Zm2.25 1.5a.75.75 0 0 0 0 1.5h.75a.75.75 0 0 0 0-1.5h-.75Z" clipRule="evenodd" />
@@ -168,7 +163,7 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
             type="button"
             onClick={() => onDelete(ticket.id)}
             title="Supprimer le ticket"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-rose-500">
               <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
@@ -177,8 +172,8 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
         </div>
       </div>
 
-      {/* Col 3 (col-span-3) : Véhicule & Heure */}
-      <div className="sm:col-span-3 min-w-0 flex flex-col justify-center gap-0.5 w-full">
+      {/* Ligne 2 : Véhicule & Heure */}
+      <div className="flex flex-col gap-0.5 min-w-0 w-full">
         {isPriorityBadgeVisible && (
           <span className="inline-flex items-center gap-1 bg-emerald-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse w-fit shadow-sm mb-0.5">
             <span>⚡</span>
@@ -189,60 +184,33 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
         <p className="text-xs text-slate-400 font-medium">Arrivée à {heureDisplay}</p>
       </div>
 
-      {/* Col 4 (col-span-2) : Technicien */}
-      <div className="sm:col-span-2 min-w-0 w-full">
-        <div className="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 max-w-full overflow-hidden">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-blue-600 shrink-0">
-            <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm-2 5V6a2 2 0 114 0v1H8z" clipRule="evenodd" />
-          </svg>
-          <span className="font-medium text-slate-500 truncate">
-            <strong className="text-slate-900 font-bold">{techNom}</strong>
-          </span>
+      {/* Ligne 3 : Technicien + Prestations */}
+      <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4 w-full">
+        <div className="min-w-0 shrink-0">
+          <div className="inline-flex items-center gap-1.5 text-xs text-slate-600 bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/60 max-w-full overflow-hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-blue-600 shrink-0">
+              <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm-2 5V6a2 2 0 114 0v1H8z" clipRule="evenodd" />
+            </svg>
+            <span className="font-medium text-slate-500 truncate">
+              <strong className="text-slate-900 font-bold">{techNom}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex flex-wrap items-start gap-1.5 flex-1">
+          {listPrestations.length > 0
+            ? listPrestations.map((prestItem, idx) => (
+                <InterventionPill key={idx} label={prestItem} />
+              ))
+            : <span className="text-xs text-slate-400 italic">—</span>
+          }
         </div>
       </div>
 
-      {/* Col 5 (col-span-2) : Prestations - flex-wrap pour les badges */}
-      <div className="sm:col-span-2 min-w-0 flex flex-wrap items-start gap-1.5 w-full">
-        {listPrestations.length > 0
-          ? listPrestations.map((prestItem, idx) => (
-              <InterventionPill key={idx} label={prestItem} />
-            ))
-          : <span className="text-xs text-slate-400 italic">—</span>
-        }
-      </div>
-
-      {/* Col 6 (col-span-2) : Badges Statut + RDV + Boutons actions */}
-      <div className="sm:col-span-2 min-w-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1.5 w-full">
-        {/* Badges sur leur propre ligne */}
-        <div className="flex flex-wrap items-center justify-start sm:justify-end gap-1.5">
-          <StatutBadge statut={ticket.statut} />
-          <RdvStatusBadge rdv={ticket.rdv} />
-        </div>
-
-        {/* Boutons d'action (Desktop) */}
-        <div className="hidden sm:flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => onPrint(ticket)}
-            title="Imprimer le ticket physique"
-            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition cursor-pointer"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-blue-500">
-              <path fillRule="evenodd" d="M7.875 1.5C6.839 1.5 6 2.34 6 3.375v2.99c-.426.053-.851.11-1.274.174-1.454.218-2.476 1.483-2.476 2.917v6.294a3 3 0 0 0 3 3h.27l-.155 1.705A1.875 1.875 0 0 0 7.232 22.5h9.536a1.875 1.875 0 0 0 1.867-2.045l-.155-1.705h.27a3 3 0 0 0 3-3V9.456c0-1.434-1.022-2.7-2.476-2.917A48.716 48.716 0 0 0 18 6.366V3.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM16.5 6.205v-2.83A.375.375 0 0 0 16.125 3h-8.25a.375.375 0 0 0-.375.375v2.83a49.353 49.353 0 0 1 9 0Zm-.217 8.265c.03.29.048.582.048.877a48.57 48.57 0 0 1-.31 5.48.75.75 0 0 1-.75.673H8.729a.75.75 0 0 1-.75-.673 48.57 48.57 0 0 1-.31-5.48c0-.295.018-.587.048-.877a49.788 49.788 0 0 0 8.556 0Zm-5.09 3.485a.75.75 0 0 1 .75-.75h.75a.75.75 0 0 1 0 1.5h-.75a.75.75 0 0 1-.75-.75Zm2.25 1.5a.75.75 0 0 0 0 1.5h.75a.75.75 0 0 0 0-1.5h-.75Z" clipRule="evenodd" />
-            </svg>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onDelete(ticket.id)}
-            title="Supprimer le ticket"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition cursor-pointer"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-              <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
+      {/* Ligne 4 : Badges Statut + RDV */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <StatutBadge statut={ticket.statut} />
+        <RdvStatusBadge rdv={ticket.rdv} />
       </div>
     </li>
   )
@@ -402,7 +370,16 @@ function CreateTicketModal({
       setIsSubmitting(false)
     } catch (err) {
       console.error('Erreur lors de la création du ticket:', err)
-      setErrors({ api: err.response?.data?.message || 'Erreur lors de l\'enregistrement du ticket.' })
+      const serverMessage =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.immatriculation?.[0] ||
+        'Erreur lors de l\'enregistrement du ticket.'
+
+      // Interception de l'erreur 422 (ticket déjà actif) : Affichage visible sous l'immatriculation sans vider le formulaire
+      setErrors({
+        api: serverMessage,
+        immat: err.response?.status === 422 ? serverMessage : undefined,
+      })
       setIsSubmitting(false)
     }
   }
@@ -449,26 +426,26 @@ function CreateTicketModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-6 overflow-y-auto"
       onClick={handleCloseModal}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-[95%] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto border border-slate-200 animate-in my-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-[95%] sm:max-w-2xl md:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto border border-slate-200 animate-in my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 sm:px-8 sm:py-5 bg-slate-900 flex items-center justify-between text-white sticky top-0 z-20">
-          <div className="flex items-center gap-3">
+        <div className="px-4 py-4 sm:px-8 sm:py-5 bg-slate-900 flex items-center justify-between text-white sticky top-0 z-20">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600 flex items-center justify-center font-extrabold text-base sm:text-lg text-white shrink-0">
               +
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold leading-snug">Nouveau Ticket de Prise en Charge</h2>
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-lg font-bold leading-snug truncate">Nouveau Ticket de Prise en Charge</h2>
               <p className="text-xs text-slate-400 hidden sm:block">Remplissez les informations du véhicule et l'attribution</p>
             </div>
           </div>
           <button
             onClick={handleCloseModal}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer shrink-0 ml-2"
           >
             ✕
           </button>
@@ -636,11 +613,11 @@ function CreateTicketModal({
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition cursor-pointer"
+                  className="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition cursor-pointer text-center"
                 >
                   Annuler
                 </button>
@@ -727,7 +704,7 @@ function PaginationControls({ currentPage, lastPage, onPageChange }) {
   }
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-200/80 rounded-b-2xl shadow-xs mt-1">
+    <div className="flex items-center justify-between px-4 sm:px-6 py-4 bg-white border-t border-slate-200/80 rounded-b-2xl shadow-xs mt-1 gap-2 flex-wrap">
       <p className="text-xs font-semibold text-slate-500">
         Page <span className="font-bold text-slate-900">{currentPage}</span> sur{' '}
         <span className="font-bold text-slate-900">{lastPage}</span>
@@ -738,9 +715,9 @@ function PaginationControls({ currentPage, lastPage, onPageChange }) {
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
+          className="px-3 py-1.5 sm:px-3.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
         >
-          &larr; Précédent
+          ← Préc.
         </button>
 
         <div className="hidden sm:flex items-center gap-1">
@@ -764,9 +741,9 @@ function PaginationControls({ currentPage, lastPage, onPageChange }) {
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= lastPage}
-          className="px-3.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
+          className="px-3 py-1.5 sm:px-3.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
         >
-          Suivant &rarr;
+          Suiv. →
         </button>
       </div>
     </div>
@@ -1034,7 +1011,7 @@ export default function DashboardReception() {
       </div>
 
       {/* 2. Remplacement des statistiques par le state kpis */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-[10px] sm:text-xs font-medium text-slate-400 uppercase">Total Enregistrés</p>
           <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">{kpis.total}</p>
@@ -1055,9 +1032,9 @@ export default function DashboardReception() {
 
       {/* Section Liste des Véhicules */}
       <div className="w-full flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
           {/* Onglets de filtrage */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 flex-wrap w-full md:w-auto">
+          <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto overflow-x-auto pb-0.5">
             {[
               { id: 'Tous', label: 'Tous', count: kpis.total },
               { id: 'En attente', label: 'En attente', count: kpis.en_attente },
@@ -1067,7 +1044,7 @@ export default function DashboardReception() {
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterTab(tab.id)}
-                className={`px-3.5 py-2 sm:py-1.5 w-full sm:w-auto rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center sm:justify-start gap-1.5 ${
+                className={`px-3.5 py-2 shrink-0 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                   filterTab === tab.id
                     ? 'bg-slate-900 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1084,13 +1061,13 @@ export default function DashboardReception() {
           </div>
 
           {/* Tri local */}
-          <div className="flex flex-col sm:flex-row items-center gap-2 text-xs w-full md:w-auto">
-            <span className="text-slate-500 font-medium whitespace-nowrap">Trier par :</span>
-            <div className="flex w-full sm:w-auto p-1 bg-slate-100 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2 text-xs w-full lg:w-auto">
+            <span className="text-slate-500 font-medium whitespace-nowrap shrink-0">Trier par :</span>
+            <div className="flex flex-1 lg:flex-none p-1 bg-slate-100 rounded-lg border border-slate-200">
               <button
                 type="button"
                 onClick={() => setSortBy('rdv')}
-                className={`flex-1 sm:flex-none px-3 py-2 sm:py-1 rounded-md font-bold transition cursor-pointer text-center ${
+                className={`flex-1 lg:flex-none px-3 py-2 sm:py-1.5 rounded-md font-bold transition cursor-pointer text-center ${
                   sortBy === 'rdv'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1101,7 +1078,7 @@ export default function DashboardReception() {
               <button
                 type="button"
                 onClick={() => setSortBy('heure')}
-                className={`flex-1 sm:flex-none px-3 py-2 sm:py-1 rounded-md font-bold transition cursor-pointer text-center ${
+                className={`flex-1 lg:flex-none px-3 py-2 sm:py-1.5 rounded-md font-bold transition cursor-pointer text-center ${
                   sortBy === 'heure'
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1114,7 +1091,7 @@ export default function DashboardReception() {
         </div>
 
         {vehiculesFiltres.length === 0 ? (
-          <div className="p-8 sm:p-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 text-slate-400 flex flex-col items-center justify-center gap-2 mx-2 sm:mx-0">
+          <div className="p-8 sm:p-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 text-slate-400 flex flex-col items-center justify-center gap-2 mx-0">
             <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xl font-bold mb-1">
               🚗
             </div>
@@ -1163,11 +1140,11 @@ export default function DashboardReception() {
       {/* ─── Modale de Confirmation de Suppression ─────────────────────────────── */}
       {isDeleteModalOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
           onClick={() => { setIsDeleteModalOpen(false); setTicketToDelete(null) }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-[92%] md:max-w-md p-5 sm:p-6 flex flex-col gap-4 sm:gap-5 animate-[fadeInScale_0.18s_ease-out]"
+            className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5 sm:p-6 flex flex-col gap-4 sm:gap-5 animate-[fadeInScale_0.18s_ease-out]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Icône + Titre */}
@@ -1187,18 +1164,18 @@ export default function DashboardReception() {
             </div>
 
             {/* Boutons */}
-            <div className="flex flex-col-reverse md:flex-row items-center justify-end gap-2 md:gap-3 pt-1 border-t border-slate-100 w-full">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-1 border-t border-slate-100 w-full">
               <button
                 type="button"
                 onClick={() => { setIsDeleteModalOpen(false); setTicketToDelete(null) }}
-                className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition cursor-pointer text-center"
+                className="w-full sm:w-auto px-4 py-3 sm:py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition cursor-pointer text-center"
               >
                 Annuler
               </button>
               <button
                 type="button"
                 onClick={confirmDelete}
-                className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-rose-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
+                className="w-full sm:w-auto px-4 py-3 sm:py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-sm font-bold shadow-lg shadow-rose-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                   <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />

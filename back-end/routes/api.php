@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogueController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DirectionController;
+use App\Http\Controllers\Api\InterventionController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReceptionController;
 use App\Http\Controllers\Api\RessourceController;
@@ -30,6 +31,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
     Route::get('/direction/dashboard', [DirectionController::class, 'dashboard']);
     Route::get('/direction/supervision', [DirectionController::class, 'supervision']);
+    Route::patch('/direction/interventions/{id}/status', [InterventionController::class, 'updateStatus']);
+    Route::put('/direction/interventions/{id}/status', [InterventionController::class, 'updateStatus']);
     Route::post('/direction/interventions/{id}/annuler', [DirectionController::class, 'annulerIntervention']);
     Route::get('/direction/bilan', [DirectionController::class, 'bilanMensuel']);
     Route::get('/direction/bilan-mensuel', [DirectionController::class, 'bilanMensuel']);
