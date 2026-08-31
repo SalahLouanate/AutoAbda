@@ -197,8 +197,8 @@ function EditInterventionModal({ isOpen, intervention, onClose, onSaved }) {
   )
 }
 
-// ─── Groupe de 3 boutons d'action par intervention ────────────────────────────
-function ActionButtons({ intervention, loadingId, onModifier, onPause, onTerminer }) {
+// ─── Groupe de 4 boutons d'action par intervention ────────────────────────────
+function ActionButtons({ intervention, loadingId, onModifier, onPause, onTerminer, onAnnuler }) {
   const isLoading = loadingId === intervention.id
   const statut = intervention.statut
   const statutLower = String(statut || '').toLowerCase()
@@ -210,7 +210,7 @@ function ActionButtons({ intervention, loadingId, onModifier, onPause, onTermine
   const canTerminer = isEnCours || isPaused || statutLower === 'en attente' || statutLower === 'en_attente'
 
   return (
-    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full">
+    <div className="grid grid-cols-4 gap-1.5 sm:gap-2 w-full">
       {/* ✏️ Modifier */}
       <button
         type="button"
@@ -249,7 +249,7 @@ function ActionButtons({ intervention, loadingId, onModifier, onPause, onTermine
           }`} />
         ) : isPaused ? (
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
           </svg>
         ) : (
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
@@ -275,6 +275,24 @@ function ActionButtons({ intervention, loadingId, onModifier, onPause, onTermine
           </svg>
         )}
         <span className="truncate">Terminer</span>
+      </button>
+
+      {/* ❌ Annuler */}
+      <button
+        type="button"
+        onClick={() => onAnnuler(intervention)}
+        disabled={isLoading}
+        title="Annuler l'intervention"
+        className="h-9 px-1.5 sm:px-2 rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-bold text-red-700 bg-red-50/90 border border-red-200/80 hover:bg-red-100 hover:border-red-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+      >
+        {isLoading ? (
+          <span className="w-3.5 h-3.5 border-2 border-red-400 border-t-red-700 rounded-full animate-spin shrink-0" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        )}
+        <span className="truncate">Annuler</span>
       </button>
     </div>
   )

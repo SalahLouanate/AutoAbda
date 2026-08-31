@@ -72,7 +72,7 @@ const OccupationDonut = memo(function OccupationDonut({ kpis }) {
   ], [occupes, libres])
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-sm font-bold text-slate-700">Taux d'occupation</h2>
@@ -82,7 +82,7 @@ const OccupationDonut = memo(function OccupationDonut({ kpis }) {
           {pct}% utilisé
         </span>
       </div>
-      <div className="flex items-center gap-6">
+      <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
         <ResponsiveContainer width={160} height={160}>
           <PieChart>
             <Pie
@@ -98,7 +98,7 @@ const OccupationDonut = memo(function OccupationDonut({ kpis }) {
             <Tooltip content={<DonutTooltip />} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="flex flex-col gap-3 flex-1">
+        <div className="flex flex-col gap-3 flex-1 w-full sm:w-auto">
           {data.map((d, i) => (
             <div key={d.name} className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: DONUT_COLORS[i] }} />
@@ -137,7 +137,7 @@ const ChargeBarChart = memo(function ChargeBarChart({ chargeTravail }) {
   })), [chargeTravail])
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm overflow-x-auto">
       <div className="mb-4">
         <h2 className="text-sm font-bold text-slate-700">Charge de travail</h2>
         <p className="text-xs text-slate-400 mt-0.5">Temps barémé vs. temps passé (min) — interventions en cours</p>
@@ -152,7 +152,7 @@ const ChargeBarChart = memo(function ChargeBarChart({ chargeTravail }) {
           <Bar dataKey="Temps Passé"  fill="#3b82f6" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
-      <div className="flex items-center gap-4 mt-3">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3">
         <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-200 inline-block"/>Temps Barémé</span>
         <span className="flex items-center gap-1.5 text-xs text-slate-400"><span className="w-3 h-3 rounded bg-blue-500 inline-block"/>Temps passé</span>
       </div>
@@ -205,7 +205,7 @@ const PontCard = memo(function PontCard({ pont }) {
   if (isMaintenance) {
     return (
       <div
-        className="rounded-2xl border-2 border-slate-300 bg-slate-100 p-5 shadow-sm overflow-hidden relative"
+        className="rounded-2xl border-2 border-slate-300 bg-slate-100 p-4 sm:p-5 shadow-sm overflow-hidden relative"
         style={{ backgroundImage: 'repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(148,163,184,.15) 8px,rgba(148,163,184,.15) 16px)' }}
       >
         <div className="absolute top-3 right-3">
@@ -228,7 +228,7 @@ const PontCard = memo(function PontCard({ pont }) {
 
   if (isLibre || !intervention) {
     return (
-      <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-5 shadow-sm flex flex-col justify-between">
+      <div className="rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-4 sm:p-5 shadow-sm flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-slate-700">{pont.nom || `Pont ${pont.id}`}</span>
           <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
@@ -248,7 +248,7 @@ const PontCard = memo(function PontCard({ pont }) {
   }
 
   return (
-    <div className={`rounded-2xl border-2 p-5 shadow-sm flex flex-col justify-between bg-white ${
+    <div className={`rounded-2xl border-2 p-4 sm:p-5 shadow-sm flex flex-col justify-between bg-white ${
       isRetard ? 'border-red-400 bg-red-50/30' : 'border-blue-300'
     }`}>
       <div className="flex items-center justify-between">
@@ -395,9 +395,9 @@ export default function DashboardDirectionView() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6 space-y-6 font-sans">
+    <div className="min-h-screen bg-slate-50/50 p-3 sm:p-6 space-y-4 sm:space-y-6 font-sans">
       {/* EN-TÊTE PRINCIPAL */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/70">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200/70">
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -405,7 +405,7 @@ export default function DashboardDirectionView() {
               Tour de Contrôle Atelier • Temps Réel
             </span>
           </div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight mt-1">
             Supervision Direction
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -413,8 +413,8 @@ export default function DashboardDirectionView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <span className="text-[11px] sm:text-xs font-bold text-slate-500 bg-slate-100 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200">
             {today} — {now}
           </span>
         </div>
@@ -428,30 +428,30 @@ export default function DashboardDirectionView() {
       )}
 
       {/* KPI & GRAPHIQUES */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <OccupationDonut kpis={kpis} />
         <ChargeBarChart chargeTravail={chargeTravail} />
 
         {/* CARTE KPI SYNTHÈSE */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h2 className="text-sm font-bold text-slate-700">Synthèse Journée</h2>
             <p className="text-xs text-slate-400 mt-0.5 font-medium">Volumétrie globale des interventions du jour</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 my-4">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 my-3 sm:my-4">
+            <div className="bg-slate-50 p-3.5 sm:p-4 rounded-xl border border-slate-100 text-center">
               <p className="text-xs font-semibold text-slate-400 uppercase">Aujourd'hui</p>
-              <p className="text-2xl font-black text-slate-800 mt-1">{kpis.total_aujourdhui}</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">{kpis.total_aujourdhui}</p>
             </div>
 
-            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+            <div className="bg-emerald-50 p-3.5 sm:p-4 rounded-xl border border-emerald-100 text-center">
               <p className="text-xs font-semibold text-emerald-600 uppercase">Clôturées</p>
-              <p className="text-2xl font-black text-emerald-700 mt-1">{kpis.cloturees_aujourdhui}</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">{kpis.cloturees_aujourdhui}</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 pt-2 border-t border-slate-100">
             <span>Ponts Libres : <strong className="text-slate-800">{kpis.ponts_libres}</strong></span>
             <span>Ponts Occupés : <strong className="text-blue-600">{kpis.ponts_occupes}</strong></span>
           </div>
@@ -460,7 +460,7 @@ export default function DashboardDirectionView() {
 
       {/* GRILLE DES PONTS (SUPERVISION ATELIER) */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
             Supervision des Ponts en Direct
             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-extrabold">
@@ -470,7 +470,7 @@ export default function DashboardDirectionView() {
           <span className="text-xs text-slate-400">Actualisation temps réel Reverb</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {pontsList.map((pont) => (
             <PontCard key={pont.id} pont={pont} />
           ))}

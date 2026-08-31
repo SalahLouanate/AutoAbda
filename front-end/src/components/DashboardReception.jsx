@@ -229,11 +229,13 @@ function CreateTicketModal({
   const [immat, setImmat] = useState('')
   const [marque, setMarque] = useState('')
   const [selectedOptions, setSelectedOptions] = useState([])
-  const [isRendezVous, setIsRendezVous] = useState(false)
-  const [modeAttribution, setModeAttribution] = useState('auto')
   const [selectedTechnicienId, setSelectedTechnicienId] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Auto-complétion transparente en arrière-plan
+  const [searchingVehicule, setSearchingVehicule] = useState(false)
+  const [vehiculeReconnu, setVehiculeReconnu] = useState(null)
 
   const [ticketCreated, setTicketCreated] = useState(false)
   const [createdTicketData, setCreatedTicketData] = useState(null)
@@ -282,16 +284,40 @@ function CreateTicketModal({
     })
   }, [catalogue, catalogueOptions])
 
+  const handleImmatBlur = async () => {
+    const cleanImmat = immat.trim().toUpperCase()
+    if (!cleanImmat || cleanImmat.length < 2) return
+
+    setSearchingVehicule(true)
+    try {
+      const res = await api.get('/reception/vehicules/search', {
+        params: { plaque: cleanImmat },
+      })
+      if (res.data?.found && res.data?.vehicule) {
+        const v = res.data.vehicule
+        if (v.nom_complet || v.marque) {
+          setMarque(v.nom_complet || `${v.marque} ${v.modele || ''}`.trim())
+        }
+        setVehiculeReconnu(v)
+      } else {
+        setVehiculeReconnu(null)
+      }
+    } catch (err) {
+      console.error('Erreur recherche véhicule:', err)
+    } finally {
+      setSearchingVehicule(false)
+    }
+  }
+
   const resetForm = () => {
     setImmat('')
     setMarque('')
     setSelectedOptions([])
-    setIsRendezVous(false)
-    setModeAttribution('auto')
     setSelectedTechnicienId('')
     setErrors({})
     setTicketCreated(false)
     setCreatedTicketData(null)
+    setVehiculeReconnu(null)
   }
 
   const handleCloseModal = () => {
@@ -306,8 +332,8 @@ function CreateTicketModal({
     if (!immat.trim()) newErrors.immat = 'L\'immatriculation est obligatoire.'
     if (!marque.trim()) newErrors.marque = 'La marque et le modèle sont obligatoires.'
     if (selectedOptions.length === 0) newErrors.interventions = 'Veuillez sélectionner au moins une intervention.'
-    if (modeAttribution === 'manuel' && !selectedTechnicienId) {
-      newErrors.technicien = 'Veuillez choisir un technicien pour l\'attribution manuelle.'
+    if (!selectedTechnicienId) {
+      newErrors.technicien = 'Veuillez choisir un technicien.'
     }
     return newErrors
   }
@@ -341,10 +367,9 @@ function CreateTicketModal({
       const payload = {
         immatriculation: immat.toUpperCase().trim(),
         marque: marque.trim(),
-        is_rdv: isRendezVous,
         interventions: interventionsIds,
-        mode_attribution: modeAttribution,
-        technicien_id: modeAttribution === 'manuel' && selectedTechnicienId ? parseInt(selectedTechnicienId, 10) : null,
+        mode_attribution: 'manuel',
+        technicien_id: parseInt(selectedTechnicienId, 10),
       }
 
       // 4. Log de débogage de la structure exacte envoyée
@@ -357,7 +382,6 @@ function CreateTicketModal({
         immat: payload.immatriculation,
         marque: payload.marque,
         interventions: selectedOptions.map((opt) => opt.nom_intervention || opt.label),
-        rdv: isRendezVous,
         heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         technicien: 'Assigné',
         statut: 'En attente',
@@ -462,22 +486,46 @@ function CreateTicketModal({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Immatriculation
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Immatriculation
+                    </label>
+                    {searchingVehicule && (
+                      <span className="text-[11px] text-blue-600 animate-pulse font-semibold">Recherche...</span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={immat}
                     onChange={(e) => {
                       setImmat(e.target.value)
                       setErrors((err) => ({ ...err, immat: undefined }))
+                      if (vehiculeReconnu && e.target.value.toUpperCase() !== vehiculeReconnu.matricule) {
+                        setVehiculeReconnu(null)
+                      }
                     }}
+                    onBlur={handleImmatBlur}
                     placeholder="ex: 14582-A-26"
                     className={`w-full font-mono font-bold text-slate-800 text-sm px-4 py-3 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase transition placeholder:normal-case placeholder:font-normal ${
                       errors.immat ? 'border-rose-400 ring-1 ring-rose-400' : 'border-gray-300'
                     }`}
                   />
                   {errors.immat && <p className="text-rose-500 text-xs mt-1 font-medium">{errors.immat}</p>}
+
+                  {vehiculeReconnu && (
+                    <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">✅</span>
+                        <div>
+                          <span className="font-bold uppercase">Véhicule reconnu : </span>
+                          <span>{vehiculeReconnu.nom_complet || vehiculeReconnu.marque}</span>
+                          {vehiculeReconnu.client_nom && (
+                            <span className="text-emerald-700 font-normal"> ({vehiculeReconnu.client_nom})</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -521,96 +569,33 @@ function CreateTicketModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                    Mode d'Attribution Technicien
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModeAttribution('auto')
-                        setErrors((err) => ({ ...err, technicien: undefined }))
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                        modeAttribution === 'auto'
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                      }`}
-                    >
-                      <span>⚡ Auto (Moins chargé)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setModeAttribution('manuel')}
-                      className={`py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                        modeAttribution === 'manuel'
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-                      }`}
-                    >
-                      <span>🛠️ Manuel</span>
-                    </button>
-                  </div>
-                </div>
-
-                {modeAttribution === 'manuel' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-                      Technicien Assigné
-                    </label>
-                    <select
-                      value={selectedTechnicienId}
-                      onChange={(e) => {
-                        setSelectedTechnicienId(e.target.value)
-                        setErrors((err) => ({ ...err, technicien: undefined }))
-                      }}
-                      className={`w-full text-slate-800 text-sm px-4 py-3 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition cursor-pointer ${
-                        errors.technicien ? 'border-rose-400 ring-1 ring-rose-400' : 'border-gray-300'
-                      }`}
-                    >
-                      <option value="">-- Choisir un technicien --</option>
-                      {techniciensDisponibles.map((tech) => {
-                        const isMaint = tech.is_maintenance || (tech.pont_statut && (tech.pont_statut.toLowerCase().includes('maint') || tech.pont_statut.toLowerCase().includes('hors')))
-                        return (
-                          <option key={tech.id} value={tech.id} disabled={isMaint}>
-                            {tech.nom || tech.name} {isMaint ? ' ⚠️ (Pont en maintenance)' : ''}
-                          </option>
-                        )
-                      })}
-                    </select>
-                    {errors.technicien && (
-                      <p className="text-rose-500 text-xs mt-1 font-medium">{errors.technicien}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2">
-                <div
-                  onClick={() => setIsRendezVous((prev) => !prev)}
-                  className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-slate-50 hover:bg-slate-100/80 transition cursor-pointer select-none"
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                  Technicien Assigné
+                </label>
+                <select
+                  value={selectedTechnicienId}
+                  onChange={(e) => {
+                    setSelectedTechnicienId(e.target.value)
+                    setErrors((err) => ({ ...err, technicien: undefined }))
+                  }}
+                  className={`w-full text-slate-800 text-sm px-4 py-3 rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition cursor-pointer ${
+                    errors.technicien ? 'border-rose-400 ring-1 ring-rose-400' : 'border-gray-300'
+                  }`}
                 >
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Client sur Rendez-vous</p>
-                    <p className="text-xs text-slate-400">
-                      {isRendezVous ? 'Passage prioritaire garanti en atelier' : 'Passage selon file d\'attente standard'}
-                    </p>
-                  </div>
-                  <div
-                    className={`w-12 h-6 p-0.5 rounded-full transition-colors duration-200 shrink-0 ${
-                      isRendezVous ? 'bg-blue-600' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span
-                      className={`block w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                        isRendezVous ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
-                  </div>
-                </div>
+                  <option value="">-- Choisir un technicien --</option>
+                  {techniciensDisponibles.map((tech) => {
+                    const isMaint = tech.is_maintenance || (tech.pont_statut && (tech.pont_statut.toLowerCase().includes('maint') || tech.pont_statut.toLowerCase().includes('hors')))
+                    return (
+                      <option key={tech.id} value={tech.id} disabled={isMaint}>
+                        {tech.nom || tech.name} {isMaint ? ' ⚠️ (Pont en maintenance)' : ''}
+                      </option>
+                    )
+                  })}
+                </select>
+                {errors.technicien && (
+                  <p className="text-rose-500 text-xs mt-1 font-medium">{errors.technicien}</p>
+                )}
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3">

@@ -178,6 +178,9 @@ function InfoBlock({ icon, label, value, fullWidth }) {
 function TicketModal({ ticket, vehicle, onClose, onDeclarer }) {
   if (!ticket) return null
 
+  const rawSt = String(ticket.statut || '').toLowerCase()
+  const isTermine = rawSt.includes('termin') || rawSt.includes('clôtur') || rawSt.includes('clotur')
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4" onClick={onClose}>
       <div
@@ -189,7 +192,7 @@ function TicketModal({ ticket, vehicle, onClose, onDeclarer }) {
             <TicketIcon className="text-yellow-400" />
             <h3 className="font-bold text-sm">Détail Intervention #{ticket.id}</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition">✕</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition cursor-pointer">✕</button>
         </div>
 
         <div className="p-6 space-y-4">
@@ -201,20 +204,26 @@ function TicketModal({ ticket, vehicle, onClose, onDeclarer }) {
             <InfoBlock icon={<CarIcon className="h-4 w-4" />} label="Véhicule" value={vehicle?.marque} />
             <InfoBlock icon={<TicketIcon className="h-4 w-4" />} label="Date" value={formatDate(ticket.created_at || ticket.date)} />
             <InfoBlock icon={<WrenchIcon className="h-4 w-4" />} label="Prestation" value={ticket.type_intervention || ticket.type} fullWidth />
-            <InfoBlock icon={<UserIcon className="h-4 w-4" />} label="Technicien" value={ticket.technicien} />
-            <InfoBlock icon={<span className="w-2 h-2 rounded-full bg-emerald-500" />} label="Statut" value={ticket.statut || 'Clôturé'} />
+            <InfoBlock icon={<UserIcon className="h-4 w-4" />} label="Technicien" value={typeof ticket.technicien === 'object' ? ticket.technicien?.name || ticket.technicien?.nom : (ticket.technicien || 'Non assigné')} />
+            <InfoBlock icon={<span className={`w-2 h-2 rounded-full ${isTermine ? 'bg-emerald-500' : 'bg-amber-500'}`} />} label="Statut" value={ticket.statut || 'En attente'} />
           </div>
         </div>
 
         <div className="px-6 pb-6 flex gap-3">
+          {/* 🛑 RÈGLE METIER : Le bouton rouge Retour SAV n'est rendu QUE SI l'intervention est "Terminée" */}
+          {isTermine && (
+            <button
+              onClick={() => onDeclarer(ticket, vehicle)}
+              className="flex-1 py-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <AlertIcon />
+              <span>Déclarer un Retour SAV</span>
+            </button>
+          )}
           <button
-            onClick={onDeclarer}
-            className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition cursor-pointer"
+            onClick={onClose}
+            className={`py-3 px-4 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-200 transition cursor-pointer ${!isTermine ? 'w-full' : ''}`}
           >
-            <AlertIcon />
-            <span>Déclarer un Retour SAV</span>
-          </button>
-          <button onClick={onClose} className="py-3 px-4 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-200 transition cursor-pointer">
             Fermer
           </button>
         </div>
@@ -279,9 +288,47 @@ export default function HistoriqueRetoursView() {
     setSelectedTicket(null)
   }
 
-  const handleDeclarer = () => {
-    alert(`✅ Retour SAV déclaré avec succès pour le ticket #${selectedTicket?.id}`)
-    setSelectedTicket(null)
+  // 🛑 RÈGLE D'OR : Assignation OBLIGATOIRE au MÊME technicien pour le ticket Retour SAV
+  const handleDeclarer = async (ticket, vehicle) => {
+    if (!ticket || !vehicle) return
+
+    const techId = ticket.technicien_id || ticket.technicien?.id || ticket.user_id
+    const immat = vehicle.immatriculation || vehicle.matricule
+    const techNom = typeof ticket.technicien === 'object' ? (ticket.technicien?.name || ticket.technicien?.nom) : (ticket.technicien || 'Technicien d\'origine')
+
+    if (!techId) {
+      alert(`⚠️ Impossible d'assigner automatiquement : L'ID du technicien d'origine (${techNom}) n'est pas disponible.`)
+      return
+    }
+
+    try {
+      const prestationsRes = await api.get('/reception/catalogue')
+      const catalogueItems = prestationsRes.data?.prestations || prestationsRes.data?.catalogue || []
+
+      const matchPrest = catalogueItems.find((p) =>
+        p.nom && ticket.type_intervention && ticket.type_intervention.toLowerCase().includes(p.nom.toLowerCase())
+      ) || catalogueItems[0]
+
+      const interventionIds = matchPrest ? [matchPrest.id] : [1]
+
+      const payload = {
+        immatriculation: immat.toUpperCase().trim(),
+        marque: (vehicle.marque || 'SAV').trim(),
+        interventions: interventionIds,
+        mode_attribution: 'manuel',
+        technicien_id: parseInt(techId, 10),
+      }
+
+      const res = await api.post('/reception/tickets', payload)
+
+      if (res.status === 200 || res.status === 201 || res.data?.status === 'success') {
+        alert(`✅ Ticket de Retour SAV créé et assigné avec succès !\n\nVéhicule : ${immat}\nAssigné obligatoirement au même technicien : ${techNom}`)
+        setSelectedTicket(null)
+      }
+    } catch (err) {
+      console.error('Erreur lors de la création du ticket de Retour SAV:', err)
+      alert(err.response?.data?.message || 'Erreur lors de la création du ticket de Retour SAV.')
+    }
   }
 
   const totalInterventionsCount = selectedVehicle?.tickets_count ?? selectedVehicle?.interventions_count ?? selectedVehicle?.interventions?.length ?? 0
@@ -308,7 +355,7 @@ export default function HistoriqueRetoursView() {
 
         {/* ── TOP BAR : Recherche + Filtres ── */}
         {!selectedVehicle && (
-          <div className="flex flex-col sm:flex-row gap-3">
+          <form onSubmit={(e) => { e.preventDefault(); }} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
                 <SearchIcon />
@@ -317,10 +364,16 @@ export default function HistoriqueRetoursView() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher une plaque d'immatriculation..."
+                placeholder="Rechercher une immatriculation..."
                 className="w-full pl-10 pr-4 py-3 text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 placeholder:font-normal shadow-xs uppercase"
               />
             </div>
+            <button
+              type="submit"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span>Rechercher</span>
+            </button>
 
             <div className="flex gap-2">
               <select
@@ -356,7 +409,7 @@ export default function HistoriqueRetoursView() {
                 ))}
               </select>
             </div>
-          </div>
+          </form>
         )}
 
         {/* ══════════════════════════════════════

@@ -73,6 +73,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/catalogue', [CatalogueController::class, 'store']);
         Route::put('/catalogue/{id}', [CatalogueController::class, 'update']);
         Route::delete('/catalogue/{id}', [CatalogueController::class, 'destroy']);
+        Route::get('/vehicules/search', [ReceptionController::class, 'searchVehicule']);
+        Route::get('/vehicules/{immatriculation}/historique', [ReceptionController::class, 'getVehiculeHistorique']);
         Route::get('/interventions', [ReceptionController::class, 'getInterventions']);
         Route::get('/tickets', [ReceptionController::class, 'getTickets']);
         Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);

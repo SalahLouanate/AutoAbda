@@ -7,6 +7,7 @@ use App\Events\TicketCreated;
 use App\Events\TicketDeleted;
 use App\Http\Controllers\Controller;
 use App\Models\Intervention;
+use App\Models\Pont;
 use App\Models\Prestation;
 use App\Models\User;
 use App\Models\Vehicule;
@@ -284,6 +285,7 @@ class ReceptionController extends Controller
                         'type_intervention' => $item->type_intervention,
                         'statut'            => $item->statut,
                         'created_at'        => $item->created_at ? $item->created_at->format('Y-m-d H:i') : null,
+                        'technicien_id'     => $item->user_id ?? $item->technicien?->id,
                         'technicien'        => $item->technicien ? $item->technicien->name : 'Non assigné',
                         'pont'              => $item->pont ? $item->pont->nom : 'Non affecté',
                     ];
@@ -612,6 +614,154 @@ class ReceptionController extends Controller
             'status' => 'success',
             'ticket' => $ticketData,
             'data'   => $ticketData,
+        ], 200);
+    }
+
+    /**
+     * Rechercher si une immatriculation existe déjà dans la base.
+     * GET /api/reception/vehicules/search?plaque=XX-123-YY
+     */
+    public function searchVehicule(Request $request): JsonResponse
+    {
+        $plaque = strtoupper(trim($request->query('plaque') ?? $request->query('immatriculation') ?? $request->query('matricule') ?? ''));
+
+        if (empty($plaque)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'L\'immatriculation est requise pour la recherche.',
+                'found'   => false,
+            ], 422);
+        }
+
+        // Rechercher le véhicule par immatriculation/matricule
+        $vehicule = Vehicule::where(DB::raw('UPPER(matricule)'), $plaque)
+            ->with(['interventions' => function ($q) {
+                $q->orderBy('created_at', 'desc');
+            }])
+            ->first();
+
+        if (!$vehicule) {
+            return response()->json([
+                'status'   => 'success',
+                'found'    => false,
+                'message'  => 'Aucun véhicule trouvé pour cette immatriculation.',
+                'vehicule' => null,
+            ], 200);
+        }
+
+        // Si le véhicule existe, récupérer les infos du véhicule et du client
+        $derniereIntervention = $vehicule->interventions->first();
+
+        $clientNom = $vehicule->client_nom 
+            ?? ($derniereIntervention ? $derniereIntervention->client_nom : null);
+        $clientPhone = $vehicule->client_telephone 
+            ?? ($derniereIntervention ? $derniereIntervention->client_telephone : null);
+
+        return response()->json([
+            'status'   => 'success',
+            'found'    => true,
+            'message'  => 'Véhicule trouvé.',
+            'vehicule' => [
+                'id'               => $vehicule->id,
+                'matricule'        => $vehicule->matricule,
+                'marque'           => $vehicule->marque,
+                'modele'           => $vehicule->modele,
+                'nom_complet'      => trim("{$vehicule->marque} {$vehicule->modele}"),
+                'client_nom'       => $clientNom ?? 'Client Enregistré',
+                'client_telephone' => $clientPhone ?? 'Non renseigné',
+            ],
+        ], 200);
+    }
+
+    /**
+     * Récupérer l'historique complet des passages d'un véhicule par immatriculation.
+     * GET /api/reception/vehicules/{immatriculation}/historique
+     */
+    public function getVehiculeHistorique(Request $request, $immatriculation): JsonResponse
+    {
+        $matricule = strtoupper(trim($immatriculation));
+
+        if (empty($matricule)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Immatriculation invalide.',
+            ], 422);
+        }
+
+        // Récupérer le véhicule si présent
+        $vehicule = Vehicule::where(DB::raw('UPPER(matricule)'), $matricule)->first();
+
+        // Récupérer toutes les interventions pour cette immatriculation (triées par date décroissante)
+        $interventions = Intervention::whereHas('vehicule', function ($q) use ($matricule) {
+                $q->where(DB::raw('UPPER(matricule)'), $matricule);
+            })
+            ->with(['vehicule.prestations', 'technicien', 'pont', 'user'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $historique = $interventions->map(function ($item) {
+            $prestationsList = $item->vehicule && $item->vehicule->prestations->isNotEmpty()
+                ? $item->vehicule->prestations->pluck('nom')->toArray()
+                : (explode(', ', $item->type_intervention ?? ''));
+
+            $nomVehicule = $item->vehicule 
+                ? trim("{$item->vehicule->marque} {$item->vehicule->modele}")
+                : 'Véhicule Inconnu';
+
+            $rawStatut = $item->statut ?? 'En attente';
+            $normalizedStatut = match(strtolower($rawStatut)) {
+                'en cours', 'en_cours' => 'En cours',
+                'bloqué', 'bloque'     => 'Bloqué',
+                'terminé', 'termine'   => 'Terminé',
+                default                => 'En attente',
+            };
+
+            return [
+                'id'                => $item->id,
+                'created_at'        => $item->created_at ? $item->created_at->toIso8601String() : null,
+                'date_passage'      => $item->created_at ? $item->created_at->format('d/m/Y') : '-',
+                'heure_arrivee'     => $item->created_at ? $item->created_at->format('H:i') : '-',
+                'date_debut'        => $item->date_debut ? $item->date_debut->format('d/m/Y H:i') : null,
+                'heure_debut'       => $item->date_debut ? $item->date_debut->format('H:i') : null,
+                'date_fin'          => $item->date_fin ? $item->date_fin->format('d/m/Y H:i') : null,
+                'heure_fin'         => $item->date_fin ? $item->date_fin->format('H:i') : null,
+                'type_intervention' => $item->type_intervention ?? implode(', ', $prestationsList),
+                'interventions'     => array_values(array_filter($prestationsList)),
+                'statut'            => $normalizedStatut,
+                'is_rdv'            => (bool) ($item->is_rdv ?? false),
+                'motif_blocage'     => $item->motif_blocage,
+                'technicien_id'     => $item->user_id ?? $item->technicien?->id,
+                'technicien'        => $item->technicien ? [
+                    'id'   => $item->technicien->id,
+                    'nom'  => $item->technicien->name,
+                    'name' => $item->technicien->name,
+                ] : ($item->user ? [
+                    'id'   => $item->user->id,
+                    'nom'  => $item->user->name,
+                    'name' => $item->user->name,
+                ] : null),
+                'pont'              => $item->pont ? [
+                    'id'  => $item->pont->id,
+                    'nom' => $item->pont->nom,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'status'          => 'success',
+            'immatriculation' => $matricule,
+            'vehicule'        => $vehicule ? [
+                'id'               => $vehicule->id,
+                'matricule'        => $vehicule->matricule,
+                'marque'           => $vehicule->marque,
+                'modele'           => $vehicule->modele,
+                'nom_complet'      => trim("{$vehicule->marque} {$vehicule->modele}"),
+                'client_nom'       => $vehicule->client_nom ?? 'Client Particulier',
+                'client_telephone' => $vehicule->client_telephone ?? 'Non renseigné',
+            ] : null,
+            'total'           => $historique->count(),
+            'historique'      => $historique,
+            'interventions'   => $historique,
         ], 200);
     }
 }

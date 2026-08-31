@@ -34,6 +34,25 @@ function calculateMinutes(startStr, endStr) {
   return Math.max(1, Math.floor((end - start) / 60000))
 }
 
+/** Helper pour obtenir les classes CSS Tailwind dynamiques du badge de statut */
+function getStatutBadgeStyle(statutRaw) {
+  const st = String(statutRaw || '').toLowerCase().trim()
+
+  if (st.includes('cours')) {
+    return 'bg-blue-100 text-blue-700 border-blue-200'
+  }
+  if (st.includes('pause')) {
+    return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+  }
+  if (st.includes('bloq')) {
+    return 'bg-red-100 text-red-700 border-red-200'
+  }
+  if (st.includes('termin') || st.includes('clôtur') || st.includes('clotur')) {
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  }
+  return 'bg-gray-100 text-gray-600 border-gray-200'
+}
+
 /** Composant Plaque d'immatriculation haute visibilité (Design Mobile D'origine 100% Intact) */
 function LicensePlate({ immat, size = 'normal' }) {
   return (
@@ -646,9 +665,8 @@ export default function TechnicienDashboardView() {
                     <div className="space-y-2">
                       {upcomingTasks.map((t) => {
                         const originalIndex = tasks.findIndex((item) => item.id === t.id)
-                        const statutLower = String(t.statut || '').toLowerCase()
-                        const isPaused = ['en pause', 'en_pause', 'pause'].includes(statutLower)
-                        const isBloque = statutLower === 'bloqué' || statutLower === 'bloque'
+                        const currentStatut = t.statut || 'En attente'
+                        const badgeColorClass = getStatutBadgeStyle(currentStatut)
 
                         return (
                           <div
@@ -674,14 +692,8 @@ export default function TechnicienDashboardView() {
                             </div>
 
                             <div className="flex flex-col items-end shrink-0 gap-1">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                isPaused
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : isBloque
-                                  ? 'bg-red-50 text-red-700 border-red-200'
-                                  : 'bg-slate-100 text-slate-700 border-slate-200'
-                              }`}>
-                                {isPaused ? 'En pause' : isBloque ? 'Bloqué' : 'En attente'}
+                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${badgeColorClass}`}>
+                                {currentStatut}
                               </span>
                               <span className="text-[10px] text-blue-600 font-semibold flex items-center">
                                 Afficher <ChevronRight className="w-3 h-3 ml-0.5" />
