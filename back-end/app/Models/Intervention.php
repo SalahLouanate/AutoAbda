@@ -17,6 +17,7 @@ class Intervention extends Model
         'type_intervention',
         'statut',
         'is_rdv',
+        'est_retour_sav',
         'motif_blocage',
         'date_debut',
         'date_fin',
@@ -27,9 +28,10 @@ class Intervention extends Model
     protected function casts(): array
     {
         return [
-            'is_rdv'     => 'boolean',
-            'date_debut' => 'datetime',
-            'date_fin'   => 'datetime',
+            'is_rdv'         => 'boolean',
+            'est_retour_sav' => 'boolean',
+            'date_debut'     => 'datetime',
+            'date_fin'       => 'datetime',
         ];
     }
 

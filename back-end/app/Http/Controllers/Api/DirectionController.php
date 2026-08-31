@@ -249,6 +249,7 @@ class DirectionController extends Controller
                 'heure_arrivee'         => $item->created_at ? $item->created_at->format('H\hi') : null,
                 'heure_affectation'     => $item->created_at ? $item->created_at->format('H\hi') : null,
                 'heure_debut'           => $item->date_debut ? Carbon::parse($item->date_debut)->format('H\hi') : null,
+                'heure_fin'             => $item->date_fin ? Carbon::parse($item->date_fin)->format('H\hi') : null,
                 'date_debut'            => $item->date_debut ? $item->date_debut->toIso8601String() : null,
                 'started_at'            => $item->date_debut ? $item->date_debut->toIso8601String() : null,
                 'date_fin'              => $item->date_fin ? $item->date_fin->toIso8601String() : null,
@@ -513,11 +514,24 @@ class DirectionController extends Controller
             $tempsPasseGlobalMin   += $tempsPasseMinSum;
             $totalPrimesDistribuees += $primeMontant;
 
+            // Comptage des interventions marquées comme Retour SAV pour ce technicien sur la période
+            $nombreRetours = Intervention::where('user_id', $tech->id)
+                ->where('est_retour_sav', true)
+                ->when($isTodayMode, function ($query) use ($targetCarbon) {
+                    return $query->whereDate('created_at', $targetCarbon);
+                })
+                ->when(!$isTodayMode, function ($query) use ($targetCarbon) {
+                    return $query->whereMonth('created_at', $targetCarbon->month)
+                                 ->whereYear('created_at', $targetCarbon->year);
+                })
+                ->count();
+
             $performancesTechniciens[] = [
                 'id'                      => $tech->id,
                 'nom'                     => $tech->name,
                 'email'                   => $tech->email,
                 'interventions_cloturees' => $countCloturees,
+                'nombre_retours'          => $nombreRetours,
                 'temps_bareme_minutes'    => $baremeMinSum,
                 'temps_bareme_heures'     => $tempsBaremeH,
                 'temps_passe_minutes'     => $tempsPasseMinSum,

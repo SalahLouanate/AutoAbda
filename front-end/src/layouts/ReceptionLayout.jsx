@@ -86,25 +86,25 @@ export default function ReceptionLayout() {
   const activeItem = NAV_ITEMS.find((n) => n.id === activeView)
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden text-slate-900">
 
       {/* ── Overlay backdrop (mobile uniquement) ── */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      {/* ── Sidebar ── */}
+      {/* ── Sidebar (Verrouillée en fond sombre statique bg-slate-900) ── */}
       <aside
-        className={`fixed top-0 left-0 h-[100dvh] w-64 bg-slate-900 flex flex-col z-40 border-r border-slate-700/50 transition-transform duration-300 ease-in-out
+        className={`fixed top-0 left-0 h-[100dvh] w-64 bg-slate-900 text-slate-100 flex flex-col z-40 border-r border-slate-800 shadow-xl transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0`}
       >
 
         {/* Brand + Bouton fermeture mobile */}
-        <div className="px-5 py-5 border-b border-slate-700/50 shrink-0 flex items-center justify-between">
+        <div className="px-5 py-5 border-b border-slate-800 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-400/20">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-slate-900">
@@ -115,7 +115,7 @@ export default function ReceptionLayout() {
             </div>
             <div>
               <p className="text-yellow-400 font-bold text-sm tracking-wide">AUTO ABDA</p>
-              <p className="text-slate-500 text-xs">Réception</p>
+              <p className="text-slate-400 text-xs">Réception</p>
             </div>
           </div>
 
@@ -134,7 +134,7 @@ export default function ReceptionLayout() {
 
         {/* Nav */}
         <nav className="flex-1 min-h-0 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
-          <p className="text-slate-600 text-xs font-semibold uppercase tracking-widest px-3 mb-3">
+          <p className="text-slate-500 text-xs font-semibold uppercase tracking-widest px-3 mb-3">
             Module Réception
           </p>
           {NAV_ITEMS.map((item) => {
@@ -150,12 +150,12 @@ export default function ReceptionLayout() {
                   ${isActive ? 'bg-yellow-400/15 text-yellow-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}`}
               >
                 <span className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 transition-colors font-black text-xs
-                  ${isActive ? 'bg-yellow-400/20 text-yellow-400' : 'bg-slate-800 text-slate-500 group-hover:bg-slate-700 group-hover:text-slate-300'}`}>
+                  ${isActive ? 'bg-yellow-400/20 text-yellow-400' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'}`}>
                   {item.step}
                 </span>
                 <div className="flex flex-col min-w-0">
                   <span className="font-semibold text-xs leading-tight">{item.label}</span>
-                  <span className={`text-xs leading-tight mt-0.5 ${isActive ? 'text-yellow-400/60' : 'text-slate-600 group-hover:text-slate-400'}`}>
+                  <span className={`text-xs leading-tight mt-0.5 ${isActive ? 'text-yellow-400/70' : 'text-slate-500 group-hover:text-slate-300'}`}>
                     {item.desc}
                   </span>
                 </div>
@@ -166,20 +166,20 @@ export default function ReceptionLayout() {
         </nav>
 
         {/* User footer */}
-        <div className="px-4 py-4 border-t border-slate-700/50 flex flex-col gap-3 shrink-0">
+        <div className="px-4 py-4 border-t border-slate-800 flex flex-col gap-3 shrink-0">
           <div className="flex items-center gap-3 px-1">
             <div className="w-8 h-8 rounded-full bg-yellow-400/20 border border-yellow-400/30 flex items-center justify-center shrink-0">
               <span className="text-yellow-400 font-bold text-xs">{user?.name?.charAt(0) ?? 'R'}</span>
             </div>
             <div className="min-w-0">
               <p className="text-slate-200 text-xs font-semibold truncate">{user?.name ?? 'Réceptionniste'}</p>
-              <p className="text-slate-500 text-xs truncate">Réception</p>
+              <p className="text-slate-400 text-xs truncate">Réception</p>
             </div>
             <div className="ml-auto w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
           </div>
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-700 text-slate-500 hover:text-rose-400 hover:border-rose-400/30 hover:bg-rose-400/5 text-xs font-medium transition-all duration-150 cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-400/40 hover:bg-rose-400/10 text-xs font-medium transition-all duration-150 cursor-pointer"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
               <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 0 1 5.25 2h5.5A2.25 2.25 0 0 1 13 4.25v2a.75.75 0 0 1-1.5 0v-2a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75v-2a.75.75 0 0 1 1.5 0v2A2.25 2.25 0 0 1 10.75 18h-5.5A2.25 2.25 0 0 1 3 15.75V4.25Z" clipRule="evenodd" />
@@ -190,15 +190,15 @@ export default function ReceptionLayout() {
         </div>
       </aside>
 
-      {/* ── Content ── */}
-      <main className="flex-1 overflow-y-auto md:ml-64 w-full min-w-0">
+      {/* ── Content (Verrouillé en fond gris très léger bg-slate-50) ── */}
+      <main className="flex-1 overflow-y-auto md:ml-64 w-full min-w-0 bg-slate-50 text-slate-900">
         {/* Topbar */}
-        <div className="sticky top-0 z-30 bg-gray-50/90 backdrop-blur-sm border-b border-slate-200/80 px-4 sm:px-8 py-3 sm:py-4 flex items-center gap-3">
+        <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 px-4 sm:px-8 py-3 sm:py-4 flex items-center gap-3 text-slate-900">
           {/* Bouton Hamburger — visible uniquement sur mobile */}
           <button
             type="button"
             onClick={() => setIsSidebarOpen(true)}
-            className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition cursor-pointer shrink-0"
+            className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-200 border border-slate-200 transition cursor-pointer shrink-0"
             aria-label="Ouvrir le menu"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -206,10 +206,10 @@ export default function ReceptionLayout() {
             </svg>
           </button>
 
-          <div className="flex items-center gap-2 text-slate-400 text-sm min-w-0">
-            <span className="font-medium text-yellow-500 text-xs uppercase tracking-widest shrink-0">Réception</span>
-            <span className="shrink-0">/</span>
-            <span className="font-semibold text-slate-700 truncate">{activeItem?.label}</span>
+          <div className="flex items-center gap-2 text-slate-500 text-sm min-w-0">
+            <span className="font-bold text-yellow-600 text-xs uppercase tracking-widest shrink-0">Réception</span>
+            <span className="shrink-0 text-slate-400">/</span>
+            <span className="font-semibold text-slate-800 truncate">{activeItem?.label}</span>
           </div>
         </div>
 

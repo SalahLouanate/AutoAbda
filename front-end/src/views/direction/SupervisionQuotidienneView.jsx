@@ -166,6 +166,8 @@ export default function SupervisionQuotidienneView() {
       tempsPasse: tempsPasseH,
       startedAt: dateDebutISO,
       heureDebut: item.heure_debut,
+      dateFin: item.date_fin,
+      heureFin: item.heure_fin,
       createdAt: item.created_at,
       heureArrivee: item.heure_arrivee || item.heure_affectation,
       baremeMin: baremeMin,
@@ -653,6 +655,8 @@ export default function SupervisionQuotidienneView() {
                                 <span>🕒 Affecté : <strong className="text-slate-700 font-semibold">{formaterHeure(intervention.heureArrivee || intervention.createdAt)}</strong></span>
                                 <span className="text-slate-300">|</span>
                                 <span>▶️ Début : <strong className="text-slate-700 font-semibold">{formaterHeure(intervention.heureDebut || intervention.startedAt)}</strong></span>
+                                <span className="text-slate-300">|</span>
+                                <span>⏹️ Fin : <strong className="text-slate-700 font-semibold">{formaterHeure(intervention.heureFin || intervention.dateFin)}</strong></span>
                               </p>
                             </div>
                             <div>{statusBadge}</div>

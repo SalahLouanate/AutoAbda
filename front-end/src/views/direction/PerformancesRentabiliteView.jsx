@@ -90,11 +90,10 @@ export default function PerformancesRentabiliteView() {
   const todayISO = new Date().toISOString().slice(0, 10)
   const monthISO = new Date().toISOString().slice(0, 7)
 
-  // 1. États pour les filtres dynamiques (valeurs par défaut : aujourd'hui et 20 MAD/h)
-  const [periode,          setPeriode]          = useState('aujourdhui') // 'aujourdhui' par défaut
-  const [vueActuelle,      setVueActuelle]      = useState('Jour')       // 'Jour' par défaut
-  const [dateSelectionnee, setDateSelectionnee] = useState(todayISO)     // Date du jour par défaut
-  const [tauxCommission,   setTauxCommission]   = useState(20)           // Taux de commission par défaut : 20 MAD/h
+  const [periode,          setPeriode]          = useState('aujourdhui')
+  const [vueActuelle,      setVueActuelle]      = useState('Jour')
+  const [dateSelectionnee, setDateSelectionnee] = useState(todayISO)
+  const [tauxCommission,   setTauxCommission]   = useState(20)
   const [bilanData,        setBilanData]        = useState(null)
   const [loading,          setLoading]          = useState(true)
   const [error,            setError]            = useState(null)
@@ -110,7 +109,6 @@ export default function PerformancesRentabiliteView() {
     }
   }
 
-  // 2. Appel API dynamique vers /api/direction/bilan
   const fetchBilanData = async () => {
     try {
       setLoading(true)
@@ -137,7 +135,6 @@ export default function PerformancesRentabiliteView() {
     fetchBilanData()
   }, [periode, dateSelectionnee, tauxCommission])
 
-  // 3. Transformation des données de rentabilité pure
   const donneesActuelles = useMemo(() => {
     if (!bilanData?.performances_techniciens) return []
 
@@ -148,6 +145,7 @@ export default function PerformancesRentabiliteView() {
       const penaliteSAV      = tech.heures_perdues       || 0
       const bilanNet         = Number((heuresSup - penaliteSAV).toFixed(2))
       const prime            = tech.prime_montant        || 0
+      const nombreRetours    = tech.nombre_retours       || 0
 
       return {
         id: tech.id,
@@ -155,7 +153,8 @@ export default function PerformancesRentabiliteView() {
         heuresAchetees: tempsVenduBareme,
         heuresFacturees: tempsPasseReel,
         heuresSup,
-        retoursSAV: penaliteSAV > 0 ? 1 : 0,
+        nombreRetours,
+        retoursSAV: nombreRetours,
         penaliteSAV,
         bilanNet,
         prime,
@@ -165,15 +164,14 @@ export default function PerformancesRentabiliteView() {
     })
   }, [bilanData])
 
-  // 4. Agrégats totaux dynamiques
   const totalAchetees   = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalFacturees  = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalPrime      = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
   const tauxEfficacite  = useMemo(() => Math.round(bilanData?.kpis_globaux?.taux_efficacite_global ?? 0), [bilanData])
   const totalBilanNet   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.bilanNet, 0).toFixed(2)), [donneesActuelles])
   const totalMalusSAV   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0).toFixed(2)), [donneesActuelles])
+  const totalRetoursSAV = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.nombreRetours, 0)), [donneesActuelles])
 
-  // 5. Données dynamiques pour le BarChart Recharts
   const chartData = useMemo(() => {
     return donneesActuelles.map((t) => ({
       nom:                    t.nom.split(' ')[0],
@@ -197,7 +195,6 @@ export default function PerformancesRentabiliteView() {
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
 
-        {/* ── EN-TÊTE & FILTRES ──────────────────────────────── */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">
@@ -209,7 +206,6 @@ export default function PerformancesRentabiliteView() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Toggle Jour / Mois */}
             <div className="flex bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
               <button
                 type="button"
@@ -235,7 +231,6 @@ export default function PerformancesRentabiliteView() {
               </button>
             </div>
 
-            {/* Input Date / Mois */}
             {vueActuelle === 'Jour' ? (
               <input
                 type="date"
@@ -252,7 +247,6 @@ export default function PerformancesRentabiliteView() {
               />
             )}
 
-            {/* Input Taux Commission */}
             <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                 Taux Commission :
@@ -270,10 +264,7 @@ export default function PerformancesRentabiliteView() {
           </div>
         </div>
 
-        {/* ── KPI CARDS GLOBAL ───────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-
-          {/* 1. Total Temps Vendu (Barème) */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center shrink-0">
               <IcoClock />
@@ -285,7 +276,6 @@ export default function PerformancesRentabiliteView() {
             </div>
           </div>
 
-          {/* 2. Total Temps Passé (Réel) */}
           <div className={`border rounded-2xl p-5 shadow-sm flex items-center gap-4 ${
             totalFacturees <= totalAchetees ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
           }`}>
@@ -305,7 +295,6 @@ export default function PerformancesRentabiliteView() {
             </div>
           </div>
 
-          {/* 3. Taux d'Efficacité */}
           <div className={`border rounded-2xl p-5 shadow-sm flex items-center gap-4 ${
             tauxEfficacite === 0
               ? 'bg-slate-50 border-slate-200'
@@ -337,7 +326,6 @@ export default function PerformancesRentabiliteView() {
             </div>
           </div>
 
-          {/* 4. Total Primes Estimées */}
           <div className="bg-violet-50 border border-violet-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
               <IcoStar />
@@ -351,7 +339,6 @@ export default function PerformancesRentabiliteView() {
 
         </div>
 
-        {/* ── BARCHART RECHARTS ──────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-x-auto">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
             <div>
@@ -379,39 +366,31 @@ export default function PerformancesRentabiliteView() {
           </ResponsiveContainer>
         </div>
 
-        {/* ── TABLEAU DÉTAILLÉ DE PRODUCTIVITÉ ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-
-          {/* Header section */}
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-slate-700">Tableau de Productivité Détaillé</h2>
-              <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                Rentabilité pure : Heures Gagnées = TEMPS VENDU (BARÈME) − TEMPS PASSÉ (RÉEL)
-              </p>
-            </div>
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-600">
-              {donneesActuelles.length} Techniciens
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-slate-800">
+              Détail des Performances Individuelles
+            </h2>
+            <span className="text-xs text-slate-400">
+              {donneesActuelles.length} technicien{donneesActuelles.length > 1 ? 's' : ''} actif{donneesActuelles.length > 1 ? 's' : ''}
             </span>
           </div>
 
-          {/* Table Header (Grid 12 colonnes avec intitulés clairs) */}
           <div className="grid grid-cols-12 px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
             <div className="col-span-2">Technicien</div>
             <div className="col-span-2 text-center text-blue-700 font-extrabold">TEMPS VENDU (BARÈME)</div>
             <div className="col-span-2 text-center text-slate-700 font-extrabold">TEMPS PASSÉ (RÉEL)</div>
             <div className="col-span-2 text-center">HEURES GAGNÉES</div>
-            <div className="col-span-1 text-center">MALUS SAV</div>
+            <div className="col-span-1 text-center font-bold text-red-700">RETOURS SAV</div>
             <div className="col-span-1 text-center">BILAN NET</div>
             <div className="col-span-2 text-right text-violet-700 font-black">PRIME (MAD)</div>
           </div>
 
-          {/* Table Body */}
           <ul className="divide-y divide-slate-100">
             {donneesActuelles.map((tech) => (
               <li key={tech.id} className="grid grid-cols-12 items-center px-6 py-3.5 hover:bg-slate-50/80 transition-colors">
                 
-                {/* 1. Technicien */}
                 <div className="col-span-2 flex items-center gap-2.5 min-w-0">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
                     tech.rentable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
@@ -420,22 +399,20 @@ export default function PerformancesRentabiliteView() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">{tech.nom}</p>
-                    {tech.retoursSAV > 0 && (
-                      <p className="text-xs text-red-500 font-medium flex items-center gap-0.5">
-                        <IcoAlert cls="h-3 w-3" />{tech.retoursSAV} SAV
+                    {tech.nombreRetours > 0 && (
+                      <p className="text-xs text-red-600 font-bold flex items-center gap-0.5 mt-0.5">
+                        <IcoAlert cls="h-3 w-3 text-red-600" />{tech.nombreRetours} Retour{tech.nombreRetours > 1 ? 's' : ''} SAV
                       </p>
                     )}
                   </div>
                 </div>
 
-                {/* 2. TEMPS VENDU (BARÈME) */}
                 <div className="col-span-2 text-center">
                   <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
                     {tech.heuresAchetees}h
                   </span>
                 </div>
 
-                {/* 3. TEMPS PASSÉ (RÉEL) */}
                 <div className="col-span-2 text-center">
                   <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${
                     tech.heuresFacturees <= tech.heuresAchetees
@@ -446,7 +423,6 @@ export default function PerformancesRentabiliteView() {
                   </span>
                 </div>
 
-                {/* 4. HEURES GAGNÉES */}
                 <div className="col-span-2 text-center">
                   <span className={`text-xs font-bold ${
                     tech.heuresSup > 0 ? 'text-emerald-600' : tech.heuresSup < 0 ? 'text-red-600' : 'text-slate-400'
@@ -455,25 +431,23 @@ export default function PerformancesRentabiliteView() {
                   </span>
                 </div>
 
-                {/* 5. Malus SAV */}
                 <div className="col-span-1 text-center">
-                  {tech.penaliteSAV > 0 ? (
-                    <span className="text-xs font-bold text-red-600 flex items-center justify-center gap-0.5">
-                      <IcoAlert cls="h-3.5 w-3.5" />-{tech.penaliteSAV}h
+                  {tech.nombreRetours > 0 ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold bg-red-100 text-red-700 border border-red-200 shadow-2xs">
+                      <IcoAlert cls="h-3.5 w-3.5 text-red-600" />
+                      <span>{tech.nombreRetours}</span>
                     </span>
                   ) : (
-                    <span className="text-xs text-slate-300">—</span>
+                    <span className="text-xs text-slate-400 font-semibold">0</span>
                   )}
                 </div>
 
-                {/* 6. Bilan Net */}
                 <div className="col-span-1 text-center">
                   <span className={`text-xs font-bold ${tech.bilanNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {fmtH(tech.bilanNet)}
                   </span>
                 </div>
 
-                {/* 7. Prime Estimée (MAD) */}
                 <div className="col-span-2 text-right">
                   {tech.prime > 0 ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
@@ -489,7 +463,6 @@ export default function PerformancesRentabiliteView() {
             ))}
           </ul>
 
-          {/* Table Totals Row */}
           <div className="grid grid-cols-12 items-center px-6 py-4 bg-slate-50 border-t-2 border-slate-200">
             <div className="col-span-2">
               <p className="text-xs font-black text-slate-600 uppercase tracking-wider">TOTAL ATELIER</p>
@@ -503,8 +476,8 @@ export default function PerformancesRentabiliteView() {
             <div className="col-span-2 text-center font-black text-xs text-slate-700">
               {fmtH(totalAchetees - totalFacturees)}
             </div>
-            <div className="col-span-1 text-center font-black text-xs text-red-600">
-              {totalMalusSAV > 0 ? `-${totalMalusSAV}h` : '—'}
+            <div className={`col-span-1 text-center font-black text-xs ${totalRetoursSAV > 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
+              {totalRetoursSAV > 0 ? `${totalRetoursSAV} SAV` : '0'}
             </div>
             <div className={`col-span-1 text-center font-black text-xs ${totalBilanNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {fmtH(totalBilanNet)}

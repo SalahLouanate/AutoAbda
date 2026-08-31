@@ -120,6 +120,9 @@ function VehicleCard({ vehicle, onClick }) {
 // ─────────────────────────────────────────────
 function TicketRow({ ticket, onClick }) {
   const statut = ticket.statut || 'Terminé'
+  const techNom = typeof ticket.technicien === 'object' && ticket.technicien !== null
+    ? (ticket.technicien.name || ticket.technicien.nom)
+    : (ticket.technicien_nom || ticket.technicien || 'Non assigné')
 
   let badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'
   if (statut === 'En cours') {
@@ -143,8 +146,14 @@ function TicketRow({ ticket, onClick }) {
           <h4 className="text-md font-semibold text-gray-800 truncate">
             {ticket.type_intervention || ticket.type}
           </h4>
-          <p className="text-sm text-gray-500 mt-0.5 truncate">
-            Technicien : {ticket.technicien || 'Non assigné'}
+          <p className="text-sm text-gray-500 mt-0.5 truncate flex items-center gap-1.5 flex-wrap">
+            <span className="font-medium text-slate-600">Technicien :</span>
+            <span className="font-bold text-slate-900">{techNom}</span>
+            {ticket.est_retour_sav && (
+              <span className="px-2 py-0.2 text-[10px] font-extrabold uppercase rounded-full bg-red-100 text-red-700 border border-red-200">
+                Retour SAV
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -204,7 +213,11 @@ function TicketModal({ ticket, vehicle, onClose, onDeclarer }) {
             <InfoBlock icon={<CarIcon className="h-4 w-4" />} label="Véhicule" value={vehicle?.marque} />
             <InfoBlock icon={<TicketIcon className="h-4 w-4" />} label="Date" value={formatDate(ticket.created_at || ticket.date)} />
             <InfoBlock icon={<WrenchIcon className="h-4 w-4" />} label="Prestation" value={ticket.type_intervention || ticket.type} fullWidth />
-            <InfoBlock icon={<UserIcon className="h-4 w-4" />} label="Technicien" value={typeof ticket.technicien === 'object' ? ticket.technicien?.name || ticket.technicien?.nom : (ticket.technicien || 'Non assigné')} />
+            <InfoBlock
+              icon={<UserIcon className="h-4 w-4" />}
+              label="Technicien"
+              value={typeof ticket.technicien === 'object' && ticket.technicien !== null ? ticket.technicien?.name || ticket.technicien?.nom : (ticket.technicien_nom || ticket.technicien || 'Non assigné')}
+            />
             <InfoBlock icon={<span className={`w-2 h-2 rounded-full ${isTermine ? 'bg-emerald-500' : 'bg-amber-500'}`} />} label="Statut" value={ticket.statut || 'En attente'} />
           </div>
         </div>
@@ -317,6 +330,7 @@ export default function HistoriqueRetoursView() {
         interventions: interventionIds,
         mode_attribution: 'manuel',
         technicien_id: parseInt(techId, 10),
+        est_retour_sav: true,
       }
 
       const res = await api.post('/reception/tickets', payload)

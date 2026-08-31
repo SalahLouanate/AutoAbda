@@ -286,7 +286,17 @@ class ReceptionController extends Controller
                         'statut'            => $item->statut,
                         'created_at'        => $item->created_at ? $item->created_at->format('Y-m-d H:i') : null,
                         'technicien_id'     => $item->user_id ?? $item->technicien?->id,
-                        'technicien'        => $item->technicien ? $item->technicien->name : 'Non assigné',
+                        'technicien'        => $item->technicien ? [
+                            'id'   => $item->technicien->id,
+                            'nom'  => $item->technicien->name,
+                            'name' => $item->technicien->name,
+                        ] : ($item->user ? [
+                            'id'   => $item->user->id,
+                            'nom'  => $item->user->name,
+                            'name' => $item->user->name,
+                        ] : null),
+                        'technicien_nom'    => $item->technicien?->name ?? $item->user?->name ?? 'Non assigné',
+                        'est_retour_sav'    => (bool) ($item->est_retour_sav ?? false),
                         'pont'              => $item->pont ? $item->pont->nom : 'Non affecté',
                     ];
                 }),
@@ -345,6 +355,7 @@ class ReceptionController extends Controller
             'immatriculation'  => 'required|string|max:50',
             'marque'           => 'required|string|max:100',
             'is_rdv'           => 'nullable|boolean',
+            'est_retour_sav'   => 'nullable|boolean',
             'interventions'    => 'required|array|min:1',
             'interventions.*'  => 'required|integer|exists:prestations,id',
             'mode_attribution' => 'nullable|string|in:auto,manuel',
@@ -354,6 +365,7 @@ class ReceptionController extends Controller
         $matricule = strtoupper(trim($validated['immatriculation']));
         $marqueInput = trim($validated['marque']);
         $isRdv = (bool) ($validated['is_rdv'] ?? false);
+        $estRetourSav = (bool) ($validated['est_retour_sav'] ?? false);
 
         // 🛑 SÉCURITÉ DOUBLE TICKET : Interdire la création si le véhicule possède une intervention active
         $existingActiveIntervention = Intervention::whereHas('vehicule', function ($q) use ($matricule) {
@@ -462,6 +474,7 @@ class ReceptionController extends Controller
             'type_intervention' => $typeInterventionLabel,
             'statut'            => 'En attente',
             'is_rdv'            => $isRdv,
+            'est_retour_sav'    => $estRetourSav,
         ]);
 
         // 5. Charger les relations du ticket (technicien, prestations via vehicule)
@@ -729,6 +742,7 @@ class ReceptionController extends Controller
                 'interventions'     => array_values(array_filter($prestationsList)),
                 'statut'            => $normalizedStatut,
                 'is_rdv'            => (bool) ($item->is_rdv ?? false),
+                'est_retour_sav'    => (bool) ($item->est_retour_sav ?? false),
                 'motif_blocage'     => $item->motif_blocage,
                 'technicien_id'     => $item->user_id ?? $item->technicien?->id,
                 'technicien'        => $item->technicien ? [
