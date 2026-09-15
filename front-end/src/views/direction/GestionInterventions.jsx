@@ -508,7 +508,7 @@ export default function GestionInterventions() {
     // - chrono_start_time    : timestamp de la session active (null si chrono arrêté)
     //
     // Temps affiché = temps_passe_accumule + (now - chrono_start_time) si En cours, sinon strictement temps_passe_accumule
-    const tempsAccumuleServeur = Number(item.temps_passe_accumule ?? item.temps_passe_minutes ?? 0)
+    const tempsAccumuleServeur = Number(item.temps_passe_accumule || item.temps_passe_minutes || item.temps_passe || 0)
     const chronoStartTime = item.chrono_start_time || item.heure_reprise
 
     let tempsPasseMin = tempsAccumuleServeur

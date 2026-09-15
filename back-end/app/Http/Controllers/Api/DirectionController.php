@@ -247,9 +247,9 @@ class DirectionController extends Controller
                 'bareme'                => $bareme,
                 'temps_bareme_total'    => $bareme,
                 'temps_passe'           => $tempsPasse,
-                'temps_passe_accumule'  => (int) ($item->temps_passe_accumule ?? $item->temps_passe_minutes ?? 0),
+                'temps_passe_accumule'  => (int) ($item->temps_passe_accumule ?: ($item->temps_passe_minutes ?: $tempsPasse)),
                 'chrono_start_time'     => $item->chrono_start_time,
-                'temps_passe_minutes'   => (int) ($item->temps_passe_accumule ?? $item->temps_passe_minutes ?? 0),
+                'temps_passe_minutes'   => (int) ($item->temps_passe_minutes ?: ($item->temps_passe_accumule ?: $tempsPasse)),
                 'heure_reprise'         => $item->chrono_start_time,
                 'est_en_retard'         => $estEnRetard,
                 'vehicule'           => $item->vehicule ? [

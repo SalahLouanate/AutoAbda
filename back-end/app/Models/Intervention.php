@@ -210,6 +210,12 @@ class Intervention extends Model
             return $total;
         }
 
+        // ✅ FALLBACK : Pour les anciens enregistrements terminés sans accumulateur sauvegardé (> 0),
+        // calculer la durée réelle à partir de date_debut et date_fin
+        if ($accumule === 0 && $this->date_debut && $this->date_fin) {
+            return max(1, (int) round(\Carbon\Carbon::parse($this->date_debut)->diffInMinutes(\Carbon\Carbon::parse($this->date_fin))));
+        }
+
         return $accumule;
     }
 

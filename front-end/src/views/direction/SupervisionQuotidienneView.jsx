@@ -138,21 +138,37 @@ export default function SupervisionQuotidienneView() {
 
     const baremeMinutesOfficiel = item.temps_bareme_officiel ?? item.catalogue?.temps_bareme ?? (item.temps_bareme_total ?? item.bareme ?? 60)
     const baremeMin = isVariable ? 0 : baremeMinutesOfficiel
-    // ✅ CALCUL CHRONO ACCUMULATEUR STRICT (Pas d'ajout de temps si bloqué ou en pause)
-    const tempsAccumuleServeur = Number(item.temps_passe_accumule ?? item.temps_passe_minutes ?? (item.temps_passe || 0))
-    const chronoStartTime = item.chrono_start_time || item.heure_reprise
+    // 🛑 ACTIONS STRICTES : Fallback robuste imposé
+    // const tempsPasse = intervention.temps_passe_accumule || intervention.temps_passe_minutes || intervention.temps_passe || 0;
+    let tempsPasseMinutes = Number(
+      item.temps_passe_accumule ||
+      item.temps_passe_minutes ||
+      item.temps_passe ||
+      0
+    )
 
-    let tempsPasseMin = tempsAccumuleServeur
-    if (item.statut === 'En cours' && chronoStartTime) {
-      const repriseMs = new Date(chronoStartTime).getTime()
-      if (!isNaN(repriseMs)) {
-        tempsPasseMin = tempsAccumuleServeur + Math.max(0, Math.floor((nowTick - repriseMs) / 60000))
+    // Fallback dynamique pour les anciens enregistrements terminés sans temps persisté (> 0)
+    if (tempsPasseMinutes === 0 && item.date_debut && item.date_fin) {
+      const dStart = new Date(item.date_debut).getTime()
+      const dEnd = new Date(item.date_fin).getTime()
+      if (!isNaN(dStart) && !isNaN(dEnd) && dEnd > dStart) {
+        tempsPasseMinutes = Math.max(1, Math.round((dEnd - dStart) / 60000))
       }
     }
 
-    // Conversion en heures décimales pour la fonction formaterTemps
+    const chronoStartTime = item.chrono_start_time || item.heure_reprise
+
+    // Si et seulement si l'intervention est en cours et a un chrono de départ, ajouter le temps écoulé en direct
+    if (item.statut === 'En cours' && chronoStartTime) {
+      const repriseMs = new Date(chronoStartTime).getTime()
+      if (!isNaN(repriseMs)) {
+        tempsPasseMinutes = tempsPasseMinutes + Math.max(0, Math.floor((nowTick - repriseMs) / 60000))
+      }
+    }
+
+    // Conversion en heures décimales pour la fonction formaterTemps et les calculs de rendement
     const tempsBaremeH = baremeMin / 60
-    const tempsPasseH  = tempsPasseMin / 60
+    const tempsPasseH  = tempsPasseMinutes / 60
 
     equipeMap[techId].interventions.push({
       id: item.id,
@@ -166,16 +182,20 @@ export default function SupervisionQuotidienneView() {
       tempsBaremeOfficiel: item.temps_bareme_officiel ?? item.catalogue?.temps_bareme,
       catalogue: item.catalogue,
       tempsPasse: tempsPasseH,
+      tempsPasseMinutes: tempsPasseMinutes,
+      temps_passe: tempsPasseMinutes,
+      temps_passe_accumule: item.temps_passe_accumule || tempsPasseMinutes,
+      temps_passe_minutes: item.temps_passe_minutes || tempsPasseMinutes,
       startedAt: item.started_at || item.date_debut || null,
       chronoStartTime: chronoStartTime,
-      tempsPasseAccumule: tempsAccumuleServeur,
+      chrono_start_time: chronoStartTime,
       heureDebut: item.heure_debut,
       dateFin: item.date_fin,
       heureFin: item.heure_fin,
       createdAt: item.created_at,
       heureArrivee: item.heure_arrivee || item.heure_affectation,
       baremeMin: baremeMin,
-      tempsPasseMin: tempsPasseMin,
+      tempsPasseMin: tempsPasseMinutes,
       estVariable: isVariable,
       pontNom: item.pont?.nom || 'Non affecté',
     })
@@ -583,9 +603,21 @@ export default function SupervisionQuotidienneView() {
                         (intervention.catalogue && intervention.catalogue.est_variable === true)
                       )
 
-                      const isDepasse = !isVariable && intervention.tempsPasse > intervention.tempsBareme
+                      // 🛑 ACTIONS STRICTES : Fallback robuste imposé
+                      // const tempsPasse = intervention.temps_passe_accumule || intervention.temps_passe_minutes || intervention.temps_passe || 0;
+                      const tempsPasseBrut = Number(
+                        intervention.temps_passe_accumule ||
+                        intervention.temps_passe_minutes ||
+                        intervention.temps_passe ||
+                        intervention.tempsPasseMin ||
+                        (intervention.tempsPasse ? Math.round(intervention.tempsPasse * 60) : 0) ||
+                        0
+                      )
+                      const tempsPasseHeures = tempsPasseBrut > 0 ? (tempsPasseBrut / 60) : (intervention.tempsPasse || 0)
+
+                      const isDepasse = !isVariable && tempsPasseHeures > intervention.tempsBareme
                       const pourcent = isVariable ? 0 : Math.min(
-                        Math.round((intervention.tempsPasse / (intervention.tempsBareme || 1)) * 100),
+                        Math.round((tempsPasseHeures / (intervention.tempsBareme || 1)) * 100),
                         100
                       )
 
@@ -682,7 +714,7 @@ export default function SupervisionQuotidienneView() {
                           {isVariable ? (
                             <div className="flex items-center justify-between text-xs font-semibold text-slate-700 pt-1">
                               <span>
-                                Temps passé : <strong className="text-slate-900 font-mono font-bold">{formaterTemps(intervention.tempsPasse)}</strong> / Barème : <span className="text-blue-600 font-extrabold">Temps réel (Indéfini)</span>
+                                Temps passé : <strong className="text-slate-900 font-mono font-bold">{formaterTemps(tempsPasseHeures)}</strong> / Barème : <span className="text-blue-600 font-extrabold">Temps réel (Indéfini)</span>
                               </span>
                               <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
                                 Durée variable
@@ -692,11 +724,11 @@ export default function SupervisionQuotidienneView() {
                             <div className="space-y-1.5 pt-1">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="font-semibold text-slate-700">
-                                  Temps passé : {formaterTemps(intervention.tempsPasse)} / Barème : {formaterTemps(intervention.tempsBaremeOfficiel ? (intervention.tempsBaremeOfficiel / 60) : intervention.tempsBareme)}
+                                  Temps passé : {formaterTemps(tempsPasseHeures)} / Barème : {formaterTemps(intervention.tempsBaremeOfficiel ? (intervention.tempsBaremeOfficiel / 60) : intervention.tempsBareme)}
                                 </span>
                                 {isDepasse ? (
                                   <span className="font-bold text-rose-600 flex items-center gap-1">
-                                    <span>+ {formaterTemps(intervention.tempsPasse - intervention.tempsBareme)}</span>
+                                    <span>+ {formaterTemps(tempsPasseHeures - intervention.tempsBareme)}</span>
                                     <span className="text-[10px] uppercase tracking-wider bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-black">
                                       Retard
                                     </span>

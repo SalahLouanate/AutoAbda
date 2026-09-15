@@ -238,9 +238,9 @@ export default function TechnicienDashboardView() {
     let interval = null
     const isEnCours = activeTask?.statut === 'En cours'
     
-    // Le temps de base DOIT être égal à temps_passe_accumule en BDD (converti en secondes)
-    const tempsAccumuleMinutes = activeTask?.temps_passe_accumule ?? activeTask?.temps_passe_minutes ?? 0
-    const tempsAccumuleSec = Number(tempsAccumuleMinutes) * 60
+    // Le temps de base DOIT être égal à temps_passe_accumule en BDD (converti en secondes, avec fallback robuste)
+    const tempsAccumuleMinutes = Number(activeTask?.temps_passe_accumule || activeTask?.temps_passe_minutes || activeTask?.temps_passe || 0)
+    const tempsAccumuleSec = tempsAccumuleMinutes * 60
 
     // Heure exacte du dernier démarrage/reprise (null si chrono arrêté, bloqué ou en pause)
     const chronoStartTime = activeTask?.chrono_start_time || activeTask?.heure_reprise || null
