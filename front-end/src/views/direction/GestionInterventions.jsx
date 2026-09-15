@@ -503,11 +503,23 @@ export default function GestionInterventions() {
     const baremeMin = isVariable ? 0 : baremeMinutesOfficiel
     const dateDebutISO = item.started_at || item.date_debut
 
-    let tempsPasseMin = item.temps_passe || 0
-    if (item.statut === 'En cours' && dateDebutISO) {
-      const startMs = new Date(dateDebutISO).getTime()
-      if (!isNaN(startMs)) tempsPasseMin = Math.max(0, Math.floor((nowTick - startMs) / 60000))
+    // ✅ CALCUL CHRONO ACCUMULATEUR STRICT :
+    // - temps_passe_accumule : temps cumulé persisté en BDD (stoppé lors des pauses/blocages)
+    // - chrono_start_time    : timestamp de la session active (null si chrono arrêté)
+    //
+    // Temps affiché = temps_passe_accumule + (now - chrono_start_time) si En cours, sinon strictement temps_passe_accumule
+    const tempsAccumuleServeur = Number(item.temps_passe_accumule ?? item.temps_passe_minutes ?? 0)
+    const chronoStartTime = item.chrono_start_time || item.heure_reprise
+
+    let tempsPasseMin = tempsAccumuleServeur
+    if (item.statut === 'En cours' && chronoStartTime) {
+      const repriseMs = new Date(chronoStartTime).getTime()
+      if (!isNaN(repriseMs)) {
+        const depuisReprise = Math.max(0, Math.floor((nowTick - repriseMs) / 60000))
+        tempsPasseMin = tempsAccumuleServeur + depuisReprise
+      }
     }
+    // Si statut != 'En cours' (Bloqué, En pause...) : on utilise strictement tempsAccumuleServeur
 
     equipeMap[techId].interventions.push({
       id: item.id,

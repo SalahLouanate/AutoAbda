@@ -175,20 +175,30 @@ const PontCard = memo(function PontCard({ pont }) {
 
   const tempsBareme = intervention?.bareme ?? intervention?.temps_bareme_total ?? 60
 
-  // ── Calcul dynamique du temps passé depuis started_at ─────────────────────
+  // ── Calcul dynamique du temps passé (Logique Accumulateur) ─────────────────────
   const calcTemps = () => {
-    const startedAt = intervention?.started_at || intervention?.date_debut || null
-    if (!startedAt) return intervention?.temps_passe ?? 0
-    const debut = new Date(startedAt)
-    if (isNaN(debut.getTime())) return intervention?.temps_passe ?? 0
-    return Math.max(0, Math.round((Date.now() - debut.getTime()) / 60000))
+    const tempsAccumule = Number(intervention?.temps_passe_accumule ?? intervention?.temps_passe_minutes ?? (intervention?.temps_passe ?? 0))
+    const isEnCours = intervention?.statut === 'En cours'
+    const chronoStart = intervention?.chrono_start_time || intervention?.heure_reprise || null
+
+    if (isEnCours && chronoStart) {
+      const debut = new Date(chronoStart)
+      if (!isNaN(debut.getTime())) {
+        return tempsAccumule + Math.max(0, Math.floor((Date.now() - debut.getTime()) / 60000))
+      }
+    }
+    return tempsAccumule
   }
 
   const [tempsPasse, setTempsPasse] = useState(calcTemps)
 
   useEffect(() => {
-    const startedAt = intervention?.started_at || intervention?.date_debut || null
-    if (!startedAt || isLibre || isMaintenance) return
+    setTempsPasse(calcTemps())
+
+    const isEnCours = intervention?.statut === 'En cours'
+    const chronoStart = intervention?.chrono_start_time || intervention?.heure_reprise || null
+
+    if (!isEnCours || !chronoStart || isLibre || isMaintenance) return
 
     // Rafraîchissement toutes les 30 secondes (précis sans surcharger)
     const timer = setInterval(() => {
@@ -197,7 +207,16 @@ const PontCard = memo(function PontCard({ pont }) {
 
     return () => clearInterval(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intervention?.started_at, intervention?.date_debut, isLibre, isMaintenance])
+  }, [
+    intervention?.id,
+    intervention?.statut,
+    intervention?.temps_passe_accumule,
+    intervention?.temps_passe_minutes,
+    intervention?.chrono_start_time,
+    intervention?.heure_reprise,
+    isLibre,
+    isMaintenance
+  ])
 
   const isRetard = !isLibre && !isMaintenance && tempsBareme > 0 && tempsPasse > tempsBareme
   const pct = tempsBareme > 0 ? Math.min(100, Math.round((tempsPasse / tempsBareme) * 100)) : 0

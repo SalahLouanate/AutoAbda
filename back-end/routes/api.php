@@ -61,6 +61,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Routes Espace Technicien
     Route::get('/technicien/tache', [TechnicienController::class, 'getCurrentTask']);
     Route::post('/technicien/tache/{id}/start', [TechnicienController::class, 'startTask']);
+    Route::post('/technicien/tache/{id}/resume', [TechnicienController::class, 'resumeTask']);
     Route::post('/technicien/tache/{id}/block', [TechnicienController::class, 'blockTask']);
     Route::post('/technicien/tache/{id}/finish', [TechnicienController::class, 'finishTask']);
     Route::get('/technicien/historique', [TechnicienController::class, 'getHistory']);

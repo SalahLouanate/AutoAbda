@@ -233,31 +233,56 @@ export default function TechnicienDashboardView() {
     }
   }, [activeTab])
 
-  // ⏱️ CHRONOMÈTRE SUR LA TÂCHE ACTIVE SELECTIONNÉE
+  // ⏱️ CHRONOMÈTRE SUR LA TÂCHE ACTIVE SÉLECTIONNÉE (LOGIQUE DE L'ACCUMULATEUR STRICT)
   useEffect(() => {
     let interval = null
     const isEnCours = activeTask?.statut === 'En cours'
-    const dateDebut = activeTask?.date_debut
+    
+    // Le temps de base DOIT être égal à temps_passe_accumule en BDD (converti en secondes)
+    const tempsAccumuleMinutes = activeTask?.temps_passe_accumule ?? activeTask?.temps_passe_minutes ?? 0
+    const tempsAccumuleSec = Number(tempsAccumuleMinutes) * 60
 
-    if (isEnCours && dateDebut) {
-      const calculateSeconds = () => {
-        const startTime = new Date(dateDebut).getTime()
-        const now = Date.now()
-        return Math.max(0, Math.floor((now - startTime) / 1000))
-      }
+    // Heure exacte du dernier démarrage/reprise (null si chrono arrêté, bloqué ou en pause)
+    const chronoStartTime = activeTask?.chrono_start_time || activeTask?.heure_reprise || null
 
-      setSeconds(calculateSeconds())
+    // SI ET SEULEMENT SI le statut est "En cours" ET que chrono_start_time n'est pas null
+    if (isEnCours && chronoStartTime) {
+      const chronoStartMs = new Date(chronoStartTime).getTime()
 
-      interval = setInterval(() => {
+      if (!isNaN(chronoStartMs)) {
+        const calculateSeconds = () => {
+          const diffMs = Date.now() - chronoStartMs
+          const secDepuisReprise = Math.max(0, Math.floor(diffMs / 1000))
+          return tempsAccumuleSec + secDepuisReprise
+        }
+
+        // Affichage immédiat
         setSeconds(calculateSeconds())
-      }, 1000)
+
+        // Incrémentation chaque seconde uniquement en direct
+        interval = setInterval(() => {
+          setSeconds(calculateSeconds())
+        }, 1000)
+      } else {
+        setSeconds(tempsAccumuleSec)
+      }
     } else {
-      setSeconds(0)
+      // SI le statut est "Bloqué", "En pause" ou "En attente", le setInterval ne doit RIEN ajouter.
+      // Le compteur affiché reste strictement égal au temps_passe_accumule récupéré depuis la base de données.
+      setSeconds(tempsAccumuleSec)
     }
+
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [activeTask?.id, activeTask?.statut, activeTask?.date_debut])
+  }, [
+    activeTask?.id,
+    activeTask?.statut,
+    activeTask?.temps_passe_accumule,
+    activeTask?.temps_passe_minutes,
+    activeTask?.chrono_start_time,
+    activeTask?.heure_reprise
+  ])
 
   // 3. Action API : Démarrer / Reprendre l'intervention
   const handleStart = async (targetId = activeTask?.id) => {
@@ -565,6 +590,25 @@ export default function TechnicienDashboardView() {
                                     </span>
                                   )}
                                 </div>
+
+                                {/* Chronomètre visuel de l'intervention */}
+                                {(activeTask.statut === 'En cours' || activeTask.statut === 'Bloqué' || isTaskPaused) && (
+                                  <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2.5 mt-2">
+                                    <span className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                                      <Clock className="w-4 h-4 text-blue-600" />
+                                      Temps passé :
+                                    </span>
+                                    <span className={`font-mono text-base font-black ${
+                                      activeTask.statut === 'En cours' 
+                                        ? 'text-blue-700' 
+                                        : activeTask.statut === 'Bloqué'
+                                        ? 'text-red-600'
+                                        : 'text-amber-700'
+                                    }`}>
+                                      {formatChrono(seconds)}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
                               {/* ALERTE BLOCAGE SI STATUT BLOQUÉ */}

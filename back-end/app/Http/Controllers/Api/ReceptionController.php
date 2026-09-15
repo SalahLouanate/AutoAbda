@@ -466,7 +466,15 @@ class ReceptionController extends Controller
             }
         }
 
-        // 4. Créer le ticket d'intervention
+        // 4. Calculer le temps barémé total côté serveur (CORRECTION BUG : source de vérité unique, indépendante du pivot)
+        // On additionne les `temps_bareme` de toutes les prestations sélectionnées par la réception.
+        $tempsBaremeTotal = $prestations->sum('temps_bareme');
+        // Fallback : si aucune prestation n'est trouvée, on retombe sur 60 min (défaut métier)
+        if ((int) $tempsBaremeTotal <= 0) {
+            $tempsBaremeTotal = 60;
+        }
+
+        // 5. Créer le ticket d'intervention avec le barème persisté en base (valeur calculée serveur)
         $intervention = Intervention::create([
             'vehicule_id'       => $vehicule->id,
             'user_id'           => $technicienId,
@@ -475,12 +483,13 @@ class ReceptionController extends Controller
             'statut'            => 'En attente',
             'is_rdv'            => $isRdv,
             'est_retour_sav'    => $estRetourSav,
+            'temps_bareme'      => (int) $tempsBaremeTotal, // ✅ Persisté en base — calcul serveur garanti
         ]);
 
-        // 5. Charger les relations du ticket (technicien, prestations via vehicule)
+        // 6. Charger les relations du ticket (technicien, prestations via vehicule)
         $intervention->load(['technicien', 'vehicule.prestations']);
 
-        // 6. Déclencher les événements Temps Réel Reverb immédiats
+        // 7. Déclencher les événements Temps Réel Reverb immédiats
         broadcast(new TicketCreated($intervention));
         broadcast(new NewVehicleArrived($intervention));
 

@@ -98,8 +98,7 @@ class DirectionController extends Controller
             } elseif ($activeIntervention) {
                 $isVar = (bool) $activeIntervention->est_variable;
                 $bareme = $isVar ? 0 : (int) ($activeIntervention->temps_bareme_total ?? 60);
-                $dateDebut = $activeIntervention->date_debut ? Carbon::parse($activeIntervention->date_debut) : Carbon::now();
-                $tempsPasse = max(0, (int) round(Carbon::now()->diffInMinutes($dateDebut)));
+                $tempsPasse = $activeIntervention->getTempsPasseReel();
 
                 $statutPont = (!$isVar && $bareme > 0 && $tempsPasse > $bareme) ? 'EN_RETARD' : 'EN_COURS';
 
@@ -205,13 +204,9 @@ class DirectionController extends Controller
             })
             ->with(['vehicule.prestations', 'user', 'pont'])
             ->where('statut', '!=', 'annule')
-            ->where(function ($query) use ($targetDate) {
-                $query->whereDate('created_at', $targetDate)
-                    ->orWhereDate('date_debut', $targetDate)
-                    ->orWhereDate('date_fin', $targetDate);
-            })
+            ->whereDate('created_at', $targetDate)
             ->orderByRaw("FIELD(statut, 'En cours', 'Bloqué', 'En attente', 'Terminé')")
-            ->orderBy('updated_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->get();
 
         $payload = $interventions->map(function ($item) {
@@ -222,11 +217,7 @@ class DirectionController extends Controller
             $isVariable = (bool) ($item->est_variable ?? ($cataloguePrestation->est_variable ?? false));
             $bareme = $isVariable ? 0 : (int) $item->temps_bareme_total;
             
-            $tempsPasse = 0;
-            if ($item->date_debut) {
-                $endDate = $item->date_fin ? Carbon::parse($item->date_fin) : Carbon::now();
-                $tempsPasse = max(0, (int) round(Carbon::parse($item->date_debut)->diffInMinutes($endDate)));
-            }
+            $tempsPasse = $item->getTempsPasseReel();
 
             $estEnRetard = !$isVariable && ($item->statut === 'En cours') && ($tempsPasse > $bareme);
 
@@ -256,6 +247,10 @@ class DirectionController extends Controller
                 'bareme'                => $bareme,
                 'temps_bareme_total'    => $bareme,
                 'temps_passe'           => $tempsPasse,
+                'temps_passe_accumule'  => (int) ($item->temps_passe_accumule ?? $item->temps_passe_minutes ?? 0),
+                'chrono_start_time'     => $item->chrono_start_time,
+                'temps_passe_minutes'   => (int) ($item->temps_passe_accumule ?? $item->temps_passe_minutes ?? 0),
+                'heure_reprise'         => $item->chrono_start_time,
                 'est_en_retard'         => $estEnRetard,
                 'vehicule'           => $item->vehicule ? [
                     'id'          => $item->vehicule->id,
@@ -343,6 +338,11 @@ class DirectionController extends Controller
 
     /**
      * Mettre à jour le statut d'une intervention (PATCH /api/direction/interventions/{id}/status)
+     *
+     * CORRECTION CHRONO :
+     *  - Passage en "En pause" : accumule le temps écoulé et stoppe heure_reprise.
+     *  - Passage en "En cours" : relance le timer (heure_reprise = now()).
+     *  - Passage en "Terminé"  : accumule le temps final avant clôture.
      */
     public function updateStatus(Request $request, $id): JsonResponse
     {
@@ -351,23 +351,33 @@ class DirectionController extends Controller
         ]);
 
         $intervention = Intervention::findOrFail($id);
-        $newStatut = $request->input('statut');
-        $statutLower = mb_strtolower($newStatut);
+        $newStatut    = $request->input('statut');
+        $statutLower  = mb_strtolower($newStatut);
 
-        if (in_array($statutLower, ['en pause', 'pause', 'en_pause'])) {
-            $intervention->statut = 'En pause';
-            if (!$intervention->motif_blocage) {
-                $intervention->motif_blocage = 'Mise en pause par le chef d\'atelier';
+        if (in_array($statutLower, ['en pause', 'pause', 'en_pause', 'bloqué', 'bloque'])) {
+            // ✅ PAUSE / BLOCAGE : Stopper le chrono et accumuler le temps
+            $intervention->accumulerTempsEtStopperTimer();
+            $intervention->statut = in_array($statutLower, ['bloqué', 'bloque']) ? 'Bloqué' : 'En pause';
+            if (!$intervention->motif_blocage && !in_array($statutLower, ['bloqué', 'bloque'])) {
+                $intervention->motif_blocage = "Mise en pause par le chef d'atelier";
             }
         } elseif (in_array($statutLower, ['en cours', 'en_cours'])) {
-            $intervention->statut = 'En cours';
+            // ✅ REPRISE : Relancer le chrono à l'instant présent sans additionner de temps
+            $intervention->statut        = 'En cours';
             $intervention->motif_blocage = null;
+            if (!$intervention->date_debut) {
+                $intervention->date_debut = now();
+            }
+            $intervention->demarrerChrono();
         } elseif (in_array($statutLower, ['terminé', 'termine', 'terminee', 'terminée'])) {
+            // ✅ CLÔTURE : Accumuler le temps restant
+            $intervention->accumulerTempsEtStopperTimer();
             $intervention->statut = 'Terminé';
             if (!$intervention->date_fin) {
                 $intervention->date_fin = now();
             }
         } elseif (in_array($statutLower, ['annulé', 'annule', 'annulee', 'annulée'])) {
+            $intervention->accumulerTempsEtStopperTimer();
             $intervention->statut = 'annule';
         } else {
             $intervention->statut = $newStatut;
@@ -380,7 +390,7 @@ class DirectionController extends Controller
 
         return response()->json([
             'status'       => 'success',
-            'message'      => 'Statut de l\'intervention mis à jour avec succès.',
+            'message'      => "Statut de l'intervention mis à jour avec succès.",
             'statut'       => $intervention->statut,
             'intervention' => $intervention,
         ], 200);
@@ -417,16 +427,17 @@ class DirectionController extends Controller
             $periodLabel = $targetCarbon->locale('fr')->translatedFormat('F Y');
         }
 
-        // Récupérer toutes les interventions clôturées ("Terminé") de la période spécifiée via when()
+        // Récupérer toutes les interventions clôturées ("Terminé") de la période spécifiée STRICTEMENT par created_at
         $interventionsCloturees = Intervention::with(['vehicule', 'user', 'pont'])
             ->where('statut', 'Terminé')
             ->when($isTodayMode, function ($query) use ($targetCarbon) {
-                return $query->whereDate('created_at', $targetCarbon)
-                             ->whereDate('date_fin', $targetCarbon);
+                return $query->whereDate('created_at', $targetCarbon);
             })
             ->when(!$isTodayMode, function ($query) use ($targetCarbon) {
-                return $query->whereMonth('created_at', $targetCarbon->month)
-                             ->whereYear('created_at', $targetCarbon->year);
+                return $query->whereBetween('created_at', [
+                    $targetCarbon->copy()->startOfMonth(),
+                    $targetCarbon->copy()->endOfMonth(),
+                ]);
             })
             ->get();
 
@@ -445,9 +456,9 @@ class DirectionController extends Controller
 
         $performancesTechniciens = [];
 
-        // Taux de prime fixe : 20 DH par heure de temps barème dépassant le seuil
-        $PRIME_TAUX    = 20;   // MAD/heure
-        $SEUIL_JOUR_H  = 8;    // heures de seuil journalier
+        // Taux de prime : 20 DH par heure de temps gagnée (barème - temps passé plafonné à 8h)
+        $PRIME_TAUX       = 20;  // MAD/heure
+        $PLAFOND_JOUR_MIN = 480; // 8 heures en minutes — le temps passé pris en compte ne peut pas dépasser ce seuil
 
         foreach ($techniciens as $tech) {
             $techInterventions = $interventionsCloturees->where('user_id', $tech->id);
@@ -462,9 +473,11 @@ class DirectionController extends Controller
                 $bareme = $item->temps_bareme_total;
                 $baremeMinSum += $bareme;
 
-                // Calcul du temps passé réel en minutes (date_debut -> date_fin)
-                $tempsPasse = 0;
-                if ($item->date_debut && $item->date_fin) {
+                // ✅ SOURCE DE VÉRITÉ : Utiliser temps_passe_minutes persisté si disponible.
+                // Fallback sur le calcul dynamique date_debut->date_fin pour les anciens enregistrements.
+                if ($item->temps_passe_minutes > 0) {
+                    $tempsPasse = (int) $item->temps_passe_minutes;
+                } elseif ($item->date_debut && $item->date_fin) {
                     $tempsPasse = max(1, (int) round(Carbon::parse($item->date_debut)->diffInMinutes(Carbon::parse($item->date_fin))));
                 } elseif ($item->date_debut) {
                     $tempsPasse = max(1, (int) round(Carbon::parse($item->date_debut)->diffInMinutes($item->updated_at)));
@@ -480,31 +493,32 @@ class DirectionController extends Controller
             $tempsBaremeH = round($baremeMinSum / 60, 2);
             $tempsPasseH  = round($tempsPasseMinSum / 60, 2);
 
-            $heuresGagnees = round($tempsBaremeH - $tempsPasseH, 2);
-            $heuresPerdues = $heuresGagnees < 0 ? abs($heuresGagnees) : 0;
-
-            // ─── Nouvelle logique de prime : 20 DH/h sur le temps barème dépassant le seuil ───
+            // ─── NOUVELLE RÈGLE MÉTIER DE LA PRIME ───────────────────────────────────────────────
             //
-            // Mode JOUR   → seuil = 8 h fixe
-            // Mode MOIS   → seuil = 8 h × nombre de jours distincts travaillés par ce technicien
-            //               (on compte les jours où la date_fin est renseignée, i.e. interventions clôturées)
-            if ($isTodayMode) {
-                $seuilH = $SEUIL_JOUR_H;
+            // CONDITION DE DÉBLOCAGE : Le technicien ne débloque sa prime QUE SI
+            // la somme de ses temps barémés (Temps Facturé) dépasse 8 heures (480 min).
+            //
+            //   if (baremeTotal > 480) {
+            //       base_prime_minutes = tempsPasseMinSum  ← Temps Réel Passé
+            //   } else {
+            //       base_prime_minutes = 0                ← Seuil non atteint
+            //   }
+            //
+            //   prime_montant = (base_prime_minutes / 60) * PRIME_TAUX
+            //
+            if ($baremeMinSum > 480) {
+                $basePrimeMin = $tempsPasseMinSum;
             } else {
-                // Nombre de jours calendaires distincts sur lesquels le technicien a clôturé au moins une intervention
-                $joursDistincts = $techInterventions
-                    ->filter(fn($i) => !is_null($i->date_fin))
-                    ->map(fn($i) => Carbon::parse($i->date_fin)->toDateString())
-                    ->unique()
-                    ->count();
-
-                // Fallback : si aucun jour n'est détectable, on utilise 1 jour pour éviter un seuil nul
-                $seuilH = $SEUIL_JOUR_H * max(1, $joursDistincts);
+                $basePrimeMin = 0; // Seuil 8h non atteint — aucune prime
             }
 
-            $heuresAuDessus = max(0, round($tempsBaremeH - $seuilH, 4));
-            $primeMontant   = round($heuresAuDessus * $PRIME_TAUX, 2);
-            // ──────────────────────────────────────────────────────────────────────────────────
+            $basePrimeH   = round($basePrimeMin / 60, 4);
+            $primeMontant = round($basePrimeH * $PRIME_TAUX, 2);
+            // ──────────────────────────────────────────────────────────────────────────────
+
+            // Indicateurs d'efficacité (indépendants de la prime)
+            $heuresGagnees = round($tempsBaremeH - $tempsPasseH, 2);
+            $heuresPerdues = $heuresGagnees < 0 ? abs($heuresGagnees) : 0;
 
             // Taux d'efficacité individuel (si le temps passé est de 0, l'efficacité retourne 0)
             $tauxEfficacite = $tempsPasseH > 0 ? round(($tempsBaremeH / $tempsPasseH) * 100, 1) : 0.0;
@@ -521,8 +535,10 @@ class DirectionController extends Controller
                     return $query->whereDate('created_at', $targetCarbon);
                 })
                 ->when(!$isTodayMode, function ($query) use ($targetCarbon) {
-                    return $query->whereMonth('created_at', $targetCarbon->month)
-                                 ->whereYear('created_at', $targetCarbon->year);
+                    return $query->whereBetween('created_at', [
+                        $targetCarbon->copy()->startOfMonth(),
+                        $targetCarbon->copy()->endOfMonth(),
+                    ]);
                 })
                 ->count();
 
@@ -538,9 +554,11 @@ class DirectionController extends Controller
                 'temps_passe_heures'      => $tempsPasseH,
                 'heures_gagnees'          => max(0, $heuresGagnees),
                 'heures_perdues'          => $heuresPerdues,
+                // ✅ Nouvelle règle prime : base = temps_passe_reel si barème > 8h, sinon 0
+                'seuil_depasse'           => $baremeMinSum > 480,
+                'base_prime_minutes'      => $basePrimeMin,
+                'base_prime_heures'       => round($basePrimeH, 2),
                 'taux_efficacite'         => $tauxEfficacite,
-                'seuil_heures'            => $seuilH,
-                'heures_au_dessus_seuil'  => $heuresAuDessus,
                 'prime_montant'           => $primeMontant,
                 'prime_formatted'         => number_format($primeMontant, 2, ',', ' ') . ' MAD',
                 'ca_genere'               => $caTech,
@@ -562,8 +580,8 @@ class DirectionController extends Controller
             $joursTravailles = 1;
         } else {
             $joursTravailles = $interventionsCloturees
-                ->filter(fn($i) => !is_null($i->date_fin))
-                ->map(fn($i) => Carbon::parse($i->date_fin)->toDateString())
+                ->filter(fn($i) => !is_null($i->created_at))
+                ->map(fn($i) => Carbon::parse($i->created_at)->toDateString())
                 ->unique()
                 ->count();
             $joursTravailles = max(1, $joursTravailles);

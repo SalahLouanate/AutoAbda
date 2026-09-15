@@ -8,13 +8,14 @@ import api from '../../api/axios'
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
+// Formate un nombre d'heures en '+Xh Ym' ou '-Xh Ym'
 function fmtH(v) {
-  if (v === 0) return '0h00'
+  if (v === 0) return '0h 00m'
   const sign = v < 0 ? '-' : '+'
   const abs  = Math.abs(v)
   const h    = Math.floor(abs)
   const m    = Math.round((abs - h) * 60)
-  return `${sign}${h}h${String(m).padStart(2, '0')}`
+  return `${sign}${h}h ${String(m).padStart(2, '0')}m`
 }
 
 function fmtMAD(v) {
@@ -139,19 +140,24 @@ export default function PerformancesRentabiliteView() {
     if (!bilanData?.performances_techniciens) return []
 
     return bilanData.performances_techniciens.map((tech) => {
-      const tempsVenduBareme = tech.temps_bareme_heures || 0
-      const tempsPasseReel   = tech.temps_passe_heures  || 0
-      const heuresSup        = tech.heures_gagnees       || 0
-      const penaliteSAV      = tech.heures_perdues       || 0
+      const tempsVenduBareme = tech.temps_bareme_heures   || 0
+      const tempsPasseReel   = tech.temps_passe_heures    || 0
+      // ✅ Nouvelle règle : base prime = temps réel passé SI barème > 8h, sinon 0
+      const basePrimeHeures  = tech.base_prime_heures     ?? 0
+      const seuilDepasse     = tech.seuil_depasse         ?? (tech.temps_bareme_minutes > 480)
+      const heuresSup        = tech.heures_gagnees        || 0
+      const penaliteSAV      = tech.heures_perdues        || 0
       const bilanNet         = Number((heuresSup - penaliteSAV).toFixed(2))
-      const prime            = tech.prime_montant        || 0
-      const nombreRetours    = tech.nombre_retours       || 0
+      const prime            = tech.prime_montant         || 0
+      const nombreRetours    = tech.nombre_retours        || 0
 
       return {
         id: tech.id,
         nom: tech.nom,
         heuresAchetees: tempsVenduBareme,
         heuresFacturees: tempsPasseReel,
+        basePrimeHeures,
+        seuilDepasse,
         heuresSup,
         nombreRetours,
         retoursSAV: nombreRetours,
@@ -381,7 +387,10 @@ export default function PerformancesRentabiliteView() {
             <div className="col-span-2">Technicien</div>
             <div className="col-span-2 text-center text-blue-700 font-extrabold">TEMPS VENDU (BARÈME)</div>
             <div className="col-span-2 text-center text-slate-700 font-extrabold">TEMPS PASSÉ (RÉEL)</div>
-            <div className="col-span-2 text-center">HEURES GAGNÉES</div>
+            <div className="col-span-2 text-center text-emerald-700 font-extrabold">
+              BASE DE PRIME
+              <span className="block text-[10px] font-normal text-slate-400 normal-case tracking-normal">(Temps Réel si barème &gt; 8h)</span>
+            </div>
             <div className="col-span-1 text-center font-bold text-red-700">RETOURS SAV</div>
             <div className="col-span-1 text-center">BILAN NET</div>
             <div className="col-span-2 text-right text-violet-700 font-black">PRIME (MAD)</div>
@@ -424,11 +433,21 @@ export default function PerformancesRentabiliteView() {
                 </div>
 
                 <div className="col-span-2 text-center">
-                  <span className={`text-xs font-bold ${
-                    tech.heuresSup > 0 ? 'text-emerald-600' : tech.heuresSup < 0 ? 'text-red-600' : 'text-slate-400'
-                  }`}>
-                    {fmtH(tech.heuresSup)}
-                  </span>
+                  {tech.seuilDepasse ? (
+                    <span
+                      className="text-xs font-black px-2.5 py-1 rounded-lg border inline-block text-emerald-700 bg-emerald-50 border-emerald-200"
+                      title={`Séuil 8h dépassé \u2014 Base prime = Temps Réel Passé (${tech.basePrimeHeures}h)`}
+                    >
+                      ⏱ {tech.basePrimeHeures}h
+                    </span>
+                  ) : (
+                    <span
+                      className="text-xs font-semibold px-2.5 py-1 rounded-lg border inline-block text-slate-400 bg-slate-50 border-slate-200"
+                      title="Séuil 8h non atteint \u2014 Aucune prime débloquée"
+                    >
+                      ⛔ Non débloquée
+                    </span>
+                  )}
                 </div>
 
                 <div className="col-span-1 text-center">
@@ -492,11 +511,11 @@ export default function PerformancesRentabiliteView() {
             <div className="flex items-center gap-2 text-violet-950 font-semibold">
               <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-pulse shrink-0" />
               <span>
-                💡 <strong>Information Taux de Prime :</strong> Prime calculée sur la base de <strong>{tauxCommission} MAD / heure gagnée</strong>.
+                💡 <strong>Règle de Prime :</strong> Prime débloquée uniquement si <strong>Temps Barémé &gt; 8h</strong>. Base = Temps Réel Passé.
               </span>
             </div>
             <div className="text-violet-800 font-bold bg-white px-3 py-1.5 rounded-xl border border-violet-200 shadow-2xs">
-              Calcul : Prime = max(0, TEMPS VENDU − TEMPS PASSÉ) × {tauxCommission} MAD
+              Prime = Temps Réel Passé (si Barème &gt; 480 min) × {tauxCommission} MAD/h
             </div>
           </div>
 

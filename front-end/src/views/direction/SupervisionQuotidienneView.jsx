@@ -138,13 +138,15 @@ export default function SupervisionQuotidienneView() {
 
     const baremeMinutesOfficiel = item.temps_bareme_officiel ?? item.catalogue?.temps_bareme ?? (item.temps_bareme_total ?? item.bareme ?? 60)
     const baremeMin = isVariable ? 0 : baremeMinutesOfficiel
-    const dateDebutISO = item.started_at || item.date_debut
+    // ✅ CALCUL CHRONO ACCUMULATEUR STRICT (Pas d'ajout de temps si bloqué ou en pause)
+    const tempsAccumuleServeur = Number(item.temps_passe_accumule ?? item.temps_passe_minutes ?? (item.temps_passe || 0))
+    const chronoStartTime = item.chrono_start_time || item.heure_reprise
 
-    let tempsPasseMin = item.temps_passe || 0
-    if (item.statut === 'En cours' && dateDebutISO) {
-      const startMs = new Date(dateDebutISO).getTime()
-      if (!isNaN(startMs)) {
-        tempsPasseMin = Math.max(0, Math.floor((nowTick - startMs) / 60000))
+    let tempsPasseMin = tempsAccumuleServeur
+    if (item.statut === 'En cours' && chronoStartTime) {
+      const repriseMs = new Date(chronoStartTime).getTime()
+      if (!isNaN(repriseMs)) {
+        tempsPasseMin = tempsAccumuleServeur + Math.max(0, Math.floor((nowTick - repriseMs) / 60000))
       }
     }
 
@@ -164,7 +166,9 @@ export default function SupervisionQuotidienneView() {
       tempsBaremeOfficiel: item.temps_bareme_officiel ?? item.catalogue?.temps_bareme,
       catalogue: item.catalogue,
       tempsPasse: tempsPasseH,
-      startedAt: dateDebutISO,
+      startedAt: item.started_at || item.date_debut || null,
+      chronoStartTime: chronoStartTime,
+      tempsPasseAccumule: tempsAccumuleServeur,
       heureDebut: item.heure_debut,
       dateFin: item.date_fin,
       heureFin: item.heure_fin,
