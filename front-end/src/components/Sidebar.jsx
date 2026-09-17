@@ -81,7 +81,7 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
   }
 
   const renderContent = (isDrawer = false) => (
-    <aside className={`fixed top-0 left-0 h-[100dvh] w-64 bg-slate-900 flex flex-col border-r border-slat-700/50 ${
+    <aside className={`fixed top-0 left-0 h-screen h-[100dvh] max-h-screen w-64 bg-slate-900 flex flex-col border-r border-slate-700/50 overflow-hidden select-none ${
       isDrawer ? 'z-50' : 'hidden lg:flex z-40'
     }`}>
       {/* Logo & Brand */}
@@ -113,8 +113,8 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       </div>
 
       {/* Navigation items SPA */}
-      <nav className="flex-1 px-3 py-5 min-h-0 flex flex-col gap-1 overflow-y-auto">
-        <p className="text-slate-600 text-xs font-semibold uppercase tracking-widest px-3 mb-3">
+      <nav className="flex-1 px-3 py-3 min-h-0 flex flex-col gap-1 overflow-y-auto no-scrollbar">
+        <p className="text-slate-600 text-[11px] font-bold uppercase tracking-widest px-3 mb-2 shrink-0">
           Module Direction
         </p>
         {NAV_ITEMS.map((item) => (
@@ -123,8 +123,8 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
             to={item.path}
             onClick={handleNavClick}
             className={({ isActive }) => `
-              group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-200 cursor-pointer
-              ${isActive ? 'bg-yellow-400/15 text-yellow-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}
+              group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors duration-150 cursor-pointer border
+              ${isActive ? 'bg-yellow-400/15 border-yellow-400/20 text-yellow-400' : 'border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-100'}
             `}
           >
             {({ isActive }) => (
@@ -133,11 +133,13 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
                   ${isActive ? 'bg-yellow-400/20 text-yellow-400' : 'bg-slate-800 text-slate-500 group-hover:bg-slate-700 group-hover:text-slate-300'}`}>
                   {item.step}
                 </span>
-                <div className="flex flex-col min-w-0">
-                  <span className="font-semibold text-xs leading-tight">{item.label}</span>
-                  <span className={`text-xs leading-tight mt-0.5 ${isActive ? 'text-yellow-400/60' : 'text-slate-600 group-hover:text-slate-400'}`}>{item.desc}</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="font-semibold text-xs leading-tight truncate whitespace-nowrap">{item.label}</span>
+                  <span className={`text-[11px] leading-tight mt-0.5 truncate whitespace-nowrap ${isActive ? 'text-yellow-400/70' : 'text-slate-500 group-hover:text-slate-400'}`}>
+                    {item.desc}
+                  </span>
                 </div>
-                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />}
+                <span className={`ml-auto w-1.5 h-1.5 rounded-full shrink-0 transition-opacity ${isActive ? 'bg-yellow-400 opacity-100' : 'opacity-0'}`} aria-hidden="true" />
               </>
             )}
           </NavLink>
@@ -145,13 +147,13 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
       </nav>
 
       {/* Profile & Logout */}
-      <div className="px-4 py-4 border-t border-slate-700/50 flex flex-col gap-3 shrink-0">
+      <div className="px-3 py-3 border-t border-slate-700/50 flex flex-col gap-2 shrink-0">
         <NavLink
           to="/direction/profil"
           onClick={handleNavClick}
           className={({ isActive }) => `
-            flex items-center gap-3 px-1 w-full rounded-xl p-2 text-left transition-all
-            ${isActive ? 'bg-yellow-400/10' : 'hover:bg-slate-800'}
+            flex items-center gap-3 px-2 py-2 w-full rounded-xl text-left transition-all border
+            ${isActive ? 'bg-yellow-400/10 border-yellow-400/20' : 'border-transparent hover:bg-slate-800'}
           `}
         >
           {({ isActive }) => (
@@ -161,7 +163,7 @@ export default function Sidebar({ mobileOpen = false, onClose }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className={`text-xs font-semibold truncate ${isActive ? 'text-yellow-400' : 'text-slate-200'}`}>{user?.name ?? 'Chef d\'Atelier'}</p>
-                <p className="text-yellow-400/70 text-xs truncate">Mon profil &amp; paramètres</p>
+                <p className="text-yellow-400/70 text-[11px] truncate">Mon profil &amp; paramètres</p>
               </div>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-slate-600 shrink-0">
                 <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clipRule="evenodd" />

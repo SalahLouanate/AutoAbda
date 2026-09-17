@@ -94,19 +94,38 @@ class ReceptionController extends Controller
             };
 
             return [
-                'id'            => $item->id,
-                'immat'         => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
-                'marque'        => $nomVehicule,
-                'interventions' => array_values(array_filter($interventionsList)),
-                'rdv'           => (bool) ($item->is_rdv ?? false),
-                'heure'         => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
-                'statut'        => $normalizedStatut,
-                'technicien'    => $item->technicien ? [
+                'id'               => $item->id,
+                'immat'            => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
+                'immatriculation'  => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
+                'marque'           => $nomVehicule,
+                'client_nom'       => $item->vehicule?->client_nom,
+                'client_telephone' => $item->vehicule?->client_telephone,
+                'client'           => [
+                    'nom'       => $item->vehicule?->client_nom ?? '',
+                    'telephone' => $item->vehicule?->client_telephone ?? '',
+                ],
+                'vehicule'         => $item->vehicule ? [
+                    'id'               => $item->vehicule->id,
+                    'matricule'        => $item->vehicule->matricule,
+                    'marque'           => $item->vehicule->marque,
+                    'modele'           => $item->vehicule->modele,
+                    'client_nom'       => $item->vehicule->client_nom,
+                    'client_telephone' => $item->vehicule->client_telephone,
+                ] : null,
+                'interventions'    => array_values(array_filter($interventionsList)),
+                'type_intervention'=> $item->type_intervention,
+                'temps_bareme'     => $item->temps_bareme,
+                'temps_bareme_total'=> $item->temps_bareme_total,
+                'motif_blocage'    => $item->motif_blocage,
+                'rdv'              => (bool) ($item->is_rdv ?? false),
+                'heure'            => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
+                'statut'           => $normalizedStatut,
+                'technicien'       => $item->technicien ? [
                     'id'   => $item->technicien->id,
                     'nom'  => $item->technicien->name,
                     'name' => $item->technicien->name,
                 ] : null,
-                'pont'          => $item->pont ? [
+                'pont'             => $item->pont ? [
                     'id'  => $item->pont->id,
                     'nom' => $item->pont->nom,
                 ] : null,
@@ -192,19 +211,38 @@ class ReceptionController extends Controller
             };
 
             return [
-                'id'            => $item->id,
-                'immat'         => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
-                'marque'        => $nomVehicule,
-                'interventions' => array_values(array_filter($interventionsList)),
-                'rdv'           => (bool) ($item->is_rdv ?? false),
-                'heure'         => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
-                'statut'        => $normalizedStatut,
-                'technicien'    => $item->technicien ? [
+                'id'               => $item->id,
+                'immat'            => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
+                'immatriculation'  => $item->vehicule ? $item->vehicule->matricule : 'INCONNU',
+                'marque'           => $nomVehicule,
+                'client_nom'       => $item->vehicule?->client_nom,
+                'client_telephone' => $item->vehicule?->client_telephone,
+                'client'           => [
+                    'nom'       => $item->vehicule?->client_nom ?? '',
+                    'telephone' => $item->vehicule?->client_telephone ?? '',
+                ],
+                'vehicule'         => $item->vehicule ? [
+                    'id'               => $item->vehicule->id,
+                    'matricule'        => $item->vehicule->matricule,
+                    'marque'           => $item->vehicule->marque,
+                    'modele'           => $item->vehicule->modele,
+                    'client_nom'       => $item->vehicule->client_nom,
+                    'client_telephone' => $item->vehicule->client_telephone,
+                ] : null,
+                'interventions'    => array_values(array_filter($interventionsList)),
+                'type_intervention'=> $item->type_intervention,
+                'temps_bareme'     => $item->temps_bareme,
+                'temps_bareme_total'=> $item->temps_bareme_total,
+                'motif_blocage'    => $item->motif_blocage,
+                'rdv'              => (bool) ($item->is_rdv ?? false),
+                'heure'            => $item->created_at ? $item->created_at->format('H:i') : date('H:i'),
+                'statut'           => $normalizedStatut,
+                'technicien'       => $item->technicien ? [
                     'id'   => $item->technicien->id,
                     'nom'  => $item->technicien->name,
                     'name' => $item->technicien->name,
                 ] : null,
-                'pont'          => $item->pont ? [
+                'pont'             => $item->pont ? [
                     'id'  => $item->pont->id,
                     'nom' => $item->pont->nom,
                 ] : null,

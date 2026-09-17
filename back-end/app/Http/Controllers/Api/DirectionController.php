@@ -429,7 +429,10 @@ class DirectionController extends Controller
 
         // Récupérer toutes les interventions clôturées ("Terminé") de la période spécifiée STRICTEMENT par created_at
         $interventionsCloturees = Intervention::with(['vehicule', 'user', 'pont'])
-            ->where('statut', 'Terminé')
+            ->where(function ($q) {
+                $q->where('statut', 'Terminé')
+                  ->orWhereIn(\Illuminate\Support\Facades\DB::raw('LOWER(statut)'), ['terminé', 'termine', 'terminee', 'clôturé', 'cloture']);
+            })
             ->when($isTodayMode, function ($query) use ($targetCarbon) {
                 return $query->whereDate('created_at', $targetCarbon);
             })
@@ -464,6 +467,7 @@ class DirectionController extends Controller
             $techInterventions = $interventionsCloturees->where('user_id', $tech->id);
 
             $countCloturees = $techInterventions->count();
+            $nbrVehiculesTraites = $countCloturees;
             $baremeMinSum = 0;
             $tempsPasseMinSum = 0;
             $caTech = 0;
@@ -546,6 +550,7 @@ class DirectionController extends Controller
                 'id'                      => $tech->id,
                 'nom'                     => $tech->name,
                 'email'                   => $tech->email,
+                'nbr_vehicules_traites'   => $nbrVehiculesTraites,
                 'interventions_cloturees' => $countCloturees,
                 'nombre_retours'          => $nombreRetours,
                 'temps_bareme_minutes'    => $baremeMinSum,
@@ -605,6 +610,7 @@ class DirectionController extends Controller
                 'rate'    => $rate,
             ],
             'kpis_globaux' => [
+                'total_vehicules_traites'    => $interventionsCloturees->count(),
                 'total_interventions'        => $interventionsCloturees->count(),
                 'chiffre_affaires'           => $chiffreAffairesTotal,
                 'chiffre_affaires_formatted' => number_format($chiffreAffairesTotal, 2, ',', ' ') . ' MAD',

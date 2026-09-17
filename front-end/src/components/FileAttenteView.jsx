@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../api/axios'
 import echo from '../echo'
+import ModifierInterventionModal from './ModifierInterventionModal'
 
 // ─── Statut config ───────────────────────────────────────────────────────────
 const STATUT_CONFIG = {
@@ -210,6 +211,15 @@ export default function FileAttenteView() {
 
   const [activeFilter, setActiveFilter] = useState('Tous')
   const [loading, setLoading] = useState(true)
+
+  // Modale de modification
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedInterventionToEdit, setSelectedInterventionToEdit] = useState(null)
+
+  const handleOpenEdit = (ticket) => {
+    setSelectedInterventionToEdit(ticket)
+    setIsEditModalOpen(true)
+  }
 
   // 3. Appel API GET /api/reception/file-attente (tous les statuts, y compris Terminé)
   const fetchFileAttente = useCallback(async (silent = false) => {
@@ -443,10 +453,28 @@ export default function FileAttenteView() {
         /* 2. Map sur vehiculesFiltres */
         <div className="flex flex-col gap-3">
           {vehiculesFiltres.map((vehicule) => (
-            <QueueTicketCard key={vehicule.id} ticket={vehicule} onDelete={handleDeleteTicket} />
+            <QueueTicketCard
+              key={vehicule.id}
+              ticket={vehicule}
+              onEdit={handleOpenEdit}
+              onDelete={handleDeleteTicket}
+            />
           ))}
         </div>
       )}
+
+      {/* Modale de Modification Dynamique */}
+      <ModifierInterventionModal
+        isOpen={isEditModalOpen}
+        intervention={selectedInterventionToEdit}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedInterventionToEdit(null)
+        }}
+        onSaved={() => {
+          fetchFileAttente(true)
+        }}
+      />
 
     </div>
   )

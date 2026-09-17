@@ -31,11 +31,25 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
     Route::get('/direction/dashboard', [DirectionController::class, 'dashboard']);
     Route::get('/direction/supervision', [DirectionController::class, 'supervision']);
+    Route::put('/direction/interventions/{id}', [InterventionController::class, 'update']);
     Route::patch('/direction/interventions/{id}/status', [InterventionController::class, 'updateStatus']);
     Route::put('/direction/interventions/{id}/status', [InterventionController::class, 'updateStatus']);
     Route::post('/direction/interventions/{id}/annuler', [DirectionController::class, 'annulerIntervention']);
     Route::get('/direction/bilan', [DirectionController::class, 'bilanMensuel']);
     Route::get('/direction/bilan-mensuel', [DirectionController::class, 'bilanMensuel']);
+
+    // Routes Globales Interventions & Tickets
+    Route::get('/interventions/{id}', [InterventionController::class, 'show']);
+    Route::put('/interventions/{id}', [InterventionController::class, 'update']);
+    Route::get('/tickets/{id}', [InterventionController::class, 'show']);
+    Route::put('/tickets/{id}', [InterventionController::class, 'update']);
+    Route::delete('/tickets/{id}', [ReceptionController::class, 'destroyTicket']);
+    Route::delete('/interventions/{id}', [ReceptionController::class, 'destroyTicket']);
+
+    // Routes Raccourcis Catalogue & Techniciens
+    Route::get('/catalogue', [CatalogueController::class, 'index']);
+    Route::get('/techniciens', [ReceptionController::class, 'getTechniciensDisponibles']);
+    Route::get('/techniciens-disponibles', [ReceptionController::class, 'getTechniciensDisponibles']);
 
     // Routes Gestion des Ressources (Personnel & Infrastructures)
     Route::prefix('direction/ressources')->group(function () {
@@ -67,8 +81,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/technicien/historique', [TechnicienController::class, 'getHistory']);
 
     // Routes Module Réception
-    Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);
-    Route::delete('/tickets/{id}', [ReceptionController::class, 'destroyTicket']);
     Route::prefix('reception')->group(function () {
         Route::get('/catalogue', [CatalogueController::class, 'index']);
         Route::post('/catalogue', [CatalogueController::class, 'store']);
@@ -78,7 +90,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/vehicules/{immatriculation}/historique', [ReceptionController::class, 'getVehiculeHistorique']);
         Route::get('/interventions', [ReceptionController::class, 'getInterventions']);
         Route::get('/tickets', [ReceptionController::class, 'getTickets']);
-        Route::get('/tickets/{id}', [ReceptionController::class, 'showTicket']);
+        Route::get('/tickets/{id}', [InterventionController::class, 'show']);
+        Route::put('/tickets/{id}', [InterventionController::class, 'update']);
+        Route::put('/interventions/{id}', [InterventionController::class, 'update']);
         Route::get('/file-attente', [ReceptionController::class, 'getFileAttente']);
         Route::get('/historique', [ReceptionController::class, 'getHistorique']);
         Route::get('/techniciens-disponibles', [ReceptionController::class, 'getTechniciensDisponibles']);

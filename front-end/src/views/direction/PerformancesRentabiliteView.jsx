@@ -23,8 +23,14 @@ function fmtMAD(v) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ICÔNES SVG
-// ─────────────────────────────────────────────────────────────────────────────
+function IcoCar({ cls = 'h-5 w-5' }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 17h8M3 11l2-5h14l2 5M3 11h18v6H3v-6zm3 6v1a1 1 0 002 0v-1m8 0v1a1 1 0 002 0v-1" />
+    </svg>
+  )
+}
+
 function IcoClock({ cls = 'h-5 w-5' }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -148,12 +154,14 @@ export default function PerformancesRentabiliteView() {
       const heuresSup        = tech.heures_gagnees        || 0
       const penaliteSAV      = tech.heures_perdues        || 0
       const bilanNet         = Number((heuresSup - penaliteSAV).toFixed(2))
+      const nbrVehiculesTraites = tech.nbr_vehicules_traites ?? tech.interventions_cloturees ?? 0
       const prime            = tech.prime_montant         || 0
       const nombreRetours    = tech.nombre_retours        || 0
 
       return {
         id: tech.id,
         nom: tech.nom,
+        nbrVehiculesTraites,
         heuresAchetees: tempsVenduBareme,
         heuresFacturees: tempsPasseReel,
         basePrimeHeures,
@@ -170,6 +178,7 @@ export default function PerformancesRentabiliteView() {
     })
   }, [bilanData])
 
+  const totalVehicules  = useMemo(() => Number(bilanData?.kpis_globaux?.total_vehicules_traites ?? bilanData?.kpis_globaux?.total_interventions ?? donneesActuelles.reduce((s, t) => s + (t.nbrVehiculesTraites || 0), 0)), [bilanData, donneesActuelles])
   const totalAchetees   = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalFacturees  = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
   const totalPrime      = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
@@ -270,7 +279,18 @@ export default function PerformancesRentabiliteView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+              <IcoCar />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Véhicules Traités</p>
+              <p className="text-2xl font-black text-amber-800 leading-none">{totalVehicules}</p>
+              <p className="text-xs text-slate-400 mt-1">Clôturés ({vueActuelle})</p>
+            </div>
+          </div>
+
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-blue-100 text-blue-500 flex items-center justify-center shrink-0">
               <IcoClock />
@@ -383,127 +403,123 @@ export default function PerformancesRentabiliteView() {
             </span>
           </div>
 
-          <div className="grid grid-cols-12 px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-            <div className="col-span-2">Technicien</div>
-            <div className="col-span-2 text-center text-blue-700 font-extrabold">TEMPS VENDU (BARÈME)</div>
-            <div className="col-span-2 text-center text-slate-700 font-extrabold">TEMPS PASSÉ (RÉEL)</div>
-            <div className="col-span-2 text-center text-emerald-700 font-extrabold">
-              BASE DE PRIME
-              <span className="block text-[10px] font-normal text-slate-400 normal-case tracking-normal">(Temps Réel si barème &gt; 8h)</span>
-            </div>
-            <div className="col-span-1 text-center font-bold text-red-700">RETOURS SAV</div>
-            <div className="col-span-1 text-center">BILAN NET</div>
-            <div className="col-span-2 text-right text-violet-700 font-black">PRIME (MAD)</div>
-          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <th scope="col" className="py-3.5 pl-6 pr-3 font-bold">Technicien</th>
+                  <th scope="col" className="py-3.5 px-3 text-center text-slate-700 font-extrabold whitespace-nowrap">
+                    Véhicules traités
+                  </th>
+                  <th scope="col" className="py-3.5 px-3 text-center text-blue-700 font-extrabold whitespace-nowrap">
+                    Temps Vendu (Barème)
+                  </th>
+                  <th scope="col" className="py-3.5 px-3 text-center text-slate-700 font-extrabold whitespace-nowrap">
+                    Temps Passé (Réel)
+                  </th>
+                  <th scope="col" className="py-3.5 px-3 text-center font-bold text-red-700 whitespace-nowrap">Retours SAV</th>
+                  <th scope="col" className="py-3.5 pl-3 pr-6 text-right text-violet-700 font-black whitespace-nowrap">Prime (MAD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {donneesActuelles.map((tech) => (
+                  <tr key={tech.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* Technicien */}
+                    <td className="py-3.5 pl-6 pr-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                          tech.rentable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {tech.nom.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{tech.nom}</p>
+                          {tech.nombreRetours > 0 && (
+                            <p className="text-xs text-red-600 font-bold flex items-center gap-0.5 mt-0.5">
+                              <IcoAlert cls="h-3 w-3 text-red-600" />{tech.nombreRetours} Retour{tech.nombreRetours > 1 ? 's' : ''} SAV
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
 
-          <ul className="divide-y divide-slate-100">
-            {donneesActuelles.map((tech) => (
-              <li key={tech.id} className="grid grid-cols-12 items-center px-6 py-3.5 hover:bg-slate-50/80 transition-colors">
-                
-                <div className="col-span-2 flex items-center gap-2.5 min-w-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                    tech.rentable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {tech.nom.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{tech.nom}</p>
-                    {tech.nombreRetours > 0 && (
-                      <p className="text-xs text-red-600 font-bold flex items-center gap-0.5 mt-0.5">
-                        <IcoAlert cls="h-3 w-3 text-red-600" />{tech.nombreRetours} Retour{tech.nombreRetours > 1 ? 's' : ''} SAV
-                      </p>
-                    )}
-                  </div>
-                </div>
+                    {/* Véhicules traités */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-slate-100 text-slate-800 border border-slate-200/80 shadow-2xs">
+                        <IcoCar cls="h-3.5 w-3.5 text-slate-500" />
+                        <span>{tech.nbrVehiculesTraites} véh.</span>
+                      </span>
+                    </td>
 
-                <div className="col-span-2 text-center">
-                  <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
-                    {tech.heuresAchetees}h
-                  </span>
-                </div>
+                    {/* Temps Vendu (Barème) */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                        {tech.heuresAchetees}h
+                      </span>
+                    </td>
 
-                <div className="col-span-2 text-center">
-                  <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                    tech.heuresFacturees <= tech.heuresAchetees
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-red-50 text-red-700 border-red-200'
-                  }`}>
-                    {tech.heuresFacturees}h
-                  </span>
-                </div>
+                    {/* Temps Passé (Réel) */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                        tech.heuresFacturees <= tech.heuresAchetees
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {tech.heuresFacturees}h
+                      </span>
+                    </td>
 
-                <div className="col-span-2 text-center">
-                  {tech.seuilDepasse ? (
-                    <span
-                      className="text-xs font-black px-2.5 py-1 rounded-lg border inline-block text-emerald-700 bg-emerald-50 border-emerald-200"
-                      title={`Séuil 8h dépassé \u2014 Base prime = Temps Réel Passé (${tech.basePrimeHeures}h)`}
-                    >
-                      ⏱ {tech.basePrimeHeures}h
+                    {/* Retours SAV */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      {tech.nombreRetours > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold bg-red-100 text-red-700 border border-red-200 shadow-2xs">
+                          <IcoAlert cls="h-3.5 w-3.5 text-red-600" />
+                          <span>{tech.nombreRetours}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-semibold">0</span>
+                      )}
+                    </td>
+
+                    {/* Prime (MAD) */}
+                    <td className="py-3.5 pl-3 pr-6 text-right whitespace-nowrap">
+                      {tech.prime > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
+                          <IcoStar cls="h-3.5 w-3.5 text-violet-500" />
+                          {tech.primeFormatted || fmtMAD(tech.prime)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300 font-medium">0 MAD</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-50 border-t-2 border-slate-200 text-xs font-bold">
+                  <td className="py-4 pl-6 pr-3 font-black text-slate-600 uppercase tracking-wider">
+                    TOTAL ATELIER
+                  </td>
+                  <td className="py-4 px-3 text-center font-black text-sm text-slate-800 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-200 text-slate-900 border border-slate-300">
+                      🚗 {totalVehicules} véh.
                     </span>
-                  ) : (
-                    <span
-                      className="text-xs font-semibold px-2.5 py-1 rounded-lg border inline-block text-slate-400 bg-slate-50 border-slate-200"
-                      title="Séuil 8h non atteint \u2014 Aucune prime débloquée"
-                    >
-                      ⛔ Non débloquée
-                    </span>
-                  )}
-                </div>
-
-                <div className="col-span-1 text-center">
-                  {tech.nombreRetours > 0 ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold bg-red-100 text-red-700 border border-red-200 shadow-2xs">
-                      <IcoAlert cls="h-3.5 w-3.5 text-red-600" />
-                      <span>{tech.nombreRetours}</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-400 font-semibold">0</span>
-                  )}
-                </div>
-
-                <div className="col-span-1 text-center">
-                  <span className={`text-xs font-bold ${tech.bilanNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {fmtH(tech.bilanNet)}
-                  </span>
-                </div>
-
-                <div className="col-span-2 text-right">
-                  {tech.prime > 0 ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
-                      <IcoStar cls="h-3.5 w-3.5 text-violet-500" />
-                      {tech.primeFormatted || fmtMAD(tech.prime)}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-300 font-medium">0 MAD</span>
-                  )}
-                </div>
-
-              </li>
-            ))}
-          </ul>
-
-          <div className="grid grid-cols-12 items-center px-6 py-4 bg-slate-50 border-t-2 border-slate-200">
-            <div className="col-span-2">
-              <p className="text-xs font-black text-slate-600 uppercase tracking-wider">TOTAL ATELIER</p>
-            </div>
-            <div className="col-span-2 text-center font-black text-sm text-blue-700">
-              {totalAchetees}h
-            </div>
-            <div className={`col-span-2 text-center font-black text-sm ${totalFacturees <= totalAchetees ? 'text-emerald-700' : 'text-red-700'}`}>
-              {totalFacturees}h
-            </div>
-            <div className="col-span-2 text-center font-black text-xs text-slate-700">
-              {fmtH(totalAchetees - totalFacturees)}
-            </div>
-            <div className={`col-span-1 text-center font-black text-xs ${totalRetoursSAV > 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
-              {totalRetoursSAV > 0 ? `${totalRetoursSAV} SAV` : '0'}
-            </div>
-            <div className={`col-span-1 text-center font-black text-xs ${totalBilanNet >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {fmtH(totalBilanNet)}
-            </div>
-            <div className="col-span-2 text-right font-black text-sm text-violet-700">
-              {fmtMAD(totalPrime)}
-            </div>
+                  </td>
+                  <td className="py-4 px-3 text-center font-black text-sm text-blue-700 whitespace-nowrap">
+                    {totalAchetees}h
+                  </td>
+                  <td className={`py-4 px-3 text-center font-black text-sm whitespace-nowrap ${totalFacturees <= totalAchetees ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {totalFacturees}h
+                  </td>
+                  <td className={`py-4 px-3 text-center font-black text-xs whitespace-nowrap ${totalRetoursSAV > 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
+                    {totalRetoursSAV > 0 ? `${totalRetoursSAV} SAV` : '0'}
+                  </td>
+                  <td className="py-4 pl-3 pr-6 text-right font-black text-sm text-violet-700 whitespace-nowrap">
+                    {fmtMAD(totalPrime)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
           {/* Encadré d'Information du Taux de Prime Explicite */}

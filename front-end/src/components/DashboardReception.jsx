@@ -4,6 +4,7 @@ import { useReactToPrint } from 'react-to-print'
 import api from '../api/axios'
 import echo from '../echo'
 import TicketTemplate from './TicketTemplate'
+import ModifierInterventionModal from './ModifierInterventionModal'
 
 // ─── Catalogue d'options par défaut pour le formulaire (fallback) ─────────────
 const DEFAULT_CATALOGUE_OPTIONS = [
@@ -90,7 +91,7 @@ function InterventionPill({ label }) {
 }
 
 // ─── Ligne Véhicule en Attente (Grid 12, Data Binding Dynamique Strict) ─────────
-function TicketRow({ ticket, index, onDelete, onPrint }) {
+function TicketRow({ ticket, index, onDelete, onPrint, onEdit }) {
   const isFirst = index === 0
   const isEnAttente = ticket.statut === 'En attente' || ticket.statut === 'en_attente'
   const isPriorityBadgeVisible = isFirst && isEnAttente
@@ -147,6 +148,20 @@ function TicketRow({ ticket, index, onDelete, onPrint }) {
 
         {/* Boutons d'action — toujours visibles à droite */}
         <div className="flex items-center gap-1 shrink-0">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(ticket)}
+              title="Modifier l'intervention"
+              className="p-1.5 rounded-lg text-slate-600 hover:text-amber-600 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 bg-white transition cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-amber-600">
+                <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+              </svg>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onPrint(ticket)}
@@ -759,6 +774,15 @@ export default function DashboardReception() {
   const [ticketToDelete, setTicketToDelete] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
+  // Modale de modification
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedInterventionToEdit, setSelectedInterventionToEdit] = useState(null)
+
+  const handleOpenEditModal = (ticket) => {
+    setSelectedInterventionToEdit(ticket)
+    setIsEditModalOpen(true)
+  }
+
   // Impression
   const [ticketToPrint, setTicketToPrint] = useState(null)
   const printRef = useRef(null)
@@ -1093,6 +1117,7 @@ export default function DashboardReception() {
                   index={index}
                   onDelete={handleDelete}
                   onPrint={triggerPrintTicket}
+                  onEdit={handleOpenEditModal}
                 />
               ))}
             </ul>
@@ -1115,6 +1140,19 @@ export default function DashboardReception() {
         onTicketCreatedSuccess={handleTicketCreatedSuccess}
         setTicketToPrint={setTicketToPrint}
         handlePrint={handlePrint}
+      />
+
+      {/* Modale de Modification Dynamique */}
+      <ModifierInterventionModal
+        isOpen={isEditModalOpen}
+        intervention={selectedInterventionToEdit}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedInterventionToEdit(null)
+        }}
+        onSaved={() => {
+          fetchFileAttente(true, currentPage)
+        }}
       />
 
       <div className="absolute left-[-9999px] top-[-9999px]">

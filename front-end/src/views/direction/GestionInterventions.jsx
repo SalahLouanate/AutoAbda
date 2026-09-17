@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import api from '../../api/axios'
 import echo from '../../echo'
+import ModifierInterventionModal from '../../components/ModifierInterventionModal'
 
 // Helper format date standard YYYY-MM-DD
 function getTodayISO() {
@@ -111,91 +112,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmLabel
   )
 }
 
-// ─── Modale d'édition d'une intervention ────────────────────────────────────
-function EditInterventionModal({ isOpen, intervention, onClose, onSaved }) {
-  const [form, setForm] = useState({ type_intervention: '', motif_blocage: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (intervention) {
-      setForm({ type_intervention: intervention.type || '', motif_blocage: intervention.motifBlocage || '' })
-      setError(null)
-    }
-  }, [intervention])
-
-  if (!isOpen || !intervention) return null
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-    setError(null)
-    try {
-      await api.put(`/direction/interventions/${intervention.id}`, form)
-      onSaved(intervention.id, form)
-      onClose()
-    } catch (err) {
-      setError(err.response?.data?.message || 'Erreur lors de la modification.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div onClick={onClose} className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" />
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
-        <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600" />
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Modifier l'intervention</h3>
-              <p className="text-xs text-slate-400 mt-0.5 truncate max-w-xs">{intervention.vehicule}</p>
-            </div>
-            <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer transition">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">⚠ {error}</div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Type d'intervention</label>
-              <input type="text" value={form.type_intervention}
-                onChange={(e) => setForm((f) => ({ ...f, type_intervention: e.target.value }))}
-                className="w-full text-sm text-slate-800 px-4 py-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                placeholder="ex: Vidange & Filtres" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                Motif de blocage <span className="text-slate-300 font-normal">(si applicable)</span>
-              </label>
-              <textarea value={form.motif_blocage}
-                onChange={(e) => setForm((f) => ({ ...f, motif_blocage: e.target.value }))}
-                rows={3}
-                className="w-full text-sm text-slate-800 px-4 py-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition resize-none"
-                placeholder="Décrire le problème rencontré..." />
-            </div>
-            <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
-              <button type="button" onClick={onClose}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition cursor-pointer">
-                Annuler
-              </button>
-              <button type="submit" disabled={isSubmitting}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition active:scale-[0.98] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
-                {isSubmitting && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Groupe de 4 boutons d'action par intervention ────────────────────────────
 function ActionButtons({ intervention, loadingId, onModifier, onPause, onTerminer, onAnnuler }) {
@@ -325,7 +242,8 @@ export default function GestionInterventions() {
   })
 
   // ── État de la modale d'édition ──────────────────────────────────────────
-  const [editModal, setEditModal] = useState({ isOpen: false, intervention: null })
+  const [selectedInterventionToEdit, setSelectedInterventionToEdit] = useState(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   // ── Chrono temps réel ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -443,7 +361,35 @@ export default function GestionInterventions() {
   }
 
   // ── Déclencheurs ─────────────────────────────────────────────────────────
-  const handleModifier = (intervention) => setEditModal({ isOpen: true, intervention })
+  const handleModifier = (intervention) => {
+    // 1. Récupération de l'objet complet d'origine issu de interventionsList
+    const rawItem = interventionsList.find((item) => String(item.id) === String(intervention.id))
+
+    // 2. Normalisation exhaustive pour garantir que le modal reçoit immatriculation, marque, technicien et prestations
+    const completeIntervention = rawItem
+      ? {
+          ...rawItem,
+          ...intervention,
+          immat: rawItem.vehicule?.matricule || rawItem.immat || rawItem.immatriculation || intervention.immat || '',
+          immatriculation: rawItem.vehicule?.matricule || rawItem.immat || rawItem.immatriculation || intervention.immatriculation || '',
+          marque: rawItem.vehicule
+            ? `${rawItem.vehicule.marque || ''} ${rawItem.vehicule.modele || ''}`.trim() || rawItem.vehicule.nom_complet
+            : intervention.marque || '',
+          technicien: rawItem.technicien || rawItem.user || intervention.technicien || null,
+          technicien_id: rawItem.technicien?.id || rawItem.user?.id || rawItem.user_id || intervention.technicien_id,
+          interventions: rawItem.vehicule?.prestations && rawItem.vehicule.prestations.length > 0
+            ? rawItem.vehicule.prestations.map((p) => p.nom || p)
+            : (rawItem.type_intervention
+                ? rawItem.type_intervention.split(',').map((s) => s.trim())
+                : (intervention.type ? [intervention.type] : [])),
+          prestations: rawItem.vehicule?.prestations || intervention.prestations || [],
+          vehicule: rawItem.vehicule || intervention.vehicule,
+        }
+      : intervention
+
+    setSelectedInterventionToEdit(completeIntervention)
+    setIsEditModalOpen(true)
+  }
 
   const handlePause = (intervention) => {
     const isPaused = ['en pause', 'en_pause', 'pause'].includes(String(intervention.statut || '').toLowerCase())
@@ -475,12 +421,8 @@ export default function GestionInterventions() {
     })
   }
 
-  const handleEditSaved = (id, updatedData) => {
-    setInterventionsList((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, type_intervention: updatedData.type_intervention, motif_blocage: updatedData.motif_blocage } : item
-      )
-    )
+  const handleEditSaved = () => {
+    fetchData(true)
   }
 
   // ── Transformation API -> groupes par technicien ──────────────────────────
@@ -504,10 +446,6 @@ export default function GestionInterventions() {
     const dateDebutISO = item.started_at || item.date_debut
 
     // ✅ CALCUL CHRONO ACCUMULATEUR STRICT :
-    // - temps_passe_accumule : temps cumulé persisté en BDD (stoppé lors des pauses/blocages)
-    // - chrono_start_time    : timestamp de la session active (null si chrono arrêté)
-    //
-    // Temps affiché = temps_passe_accumule + (now - chrono_start_time) si En cours, sinon strictement temps_passe_accumule
     const tempsAccumuleServeur = Number(item.temps_passe_accumule || item.temps_passe_minutes || item.temps_passe || 0)
     const chronoStartTime = item.chrono_start_time || item.heure_reprise
 
@@ -519,16 +457,29 @@ export default function GestionInterventions() {
         tempsPasseMin = tempsAccumuleServeur + depuisReprise
       }
     }
-    // Si statut != 'En cours' (Bloqué, En pause...) : on utilise strictement tempsAccumuleServeur
+
+    const immatClean = item.vehicule?.matricule || item.immat || item.immatriculation || ''
+    const marqueClean = item.vehicule
+      ? `${item.vehicule.marque || ''} ${item.vehicule.modele || ''}`.trim() || item.vehicule.nom_complet
+      : (item.marque || '')
 
     equipeMap[techId].interventions.push({
       id: item.id,
+      raw: item,
       vehicule: item.vehicule ? `${item.vehicule.nom_complet || item.vehicule.marque} (${item.vehicule.matricule})` : 'Véhicule N/A',
-      clientNom: item.client?.nom || 'Client Particulier',
-      clientTel: item.client?.telephone || 'Non renseigné',
+      vehiculeObj: item.vehicule,
+      immat: immatClean,
+      immatriculation: immatClean,
+      marque: marqueClean,
+      modele: item.vehicule?.modele || '',
+      technicien: item.technicien ? { id: item.technicien.id, nom: item.technicien.nom_complet || item.technicien.nom, name: item.technicien.nom_complet || item.technicien.name } : { id: techId, nom: techNom, name: techNom },
+      technicien_id: item.technicien?.id || techId,
+      interventions: item.vehicule?.prestations ? item.vehicule.prestations.map((p) => p.nom || p) : (item.type_intervention ? item.type_intervention.split(',').map((s) => s.trim()) : []),
       type: item.type_intervention,
+      type_intervention: item.type_intervention,
       statut: item.statut,
       motifBlocage: item.motif_blocage,
+      motif_blocage: item.motif_blocage,
       tempsBareme: baremeMin / 60,
       tempsBaremeOfficiel: item.temps_bareme_officiel ?? item.catalogue?.temps_bareme,
       catalogue: item.catalogue,
@@ -593,10 +544,13 @@ export default function GestionInterventions() {
         confirmColor={confirmModal.confirmColor}
         isLoading={confirmModal.isLoading}
       />
-      <EditInterventionModal
-        isOpen={editModal.isOpen}
-        intervention={editModal.intervention}
-        onClose={() => setEditModal({ isOpen: false, intervention: null })}
+      <ModifierInterventionModal
+        isOpen={isEditModalOpen}
+        intervention={selectedInterventionToEdit}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedInterventionToEdit(null)
+        }}
         onSaved={handleEditSaved}
       />
 
