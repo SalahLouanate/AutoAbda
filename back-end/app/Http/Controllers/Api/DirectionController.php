@@ -459,9 +459,9 @@ class DirectionController extends Controller
 
         $performancesTechniciens = [];
 
-        // Taux de prime : 20 DH par heure de temps gagnée (barème - temps passé plafonné à 8h)
-        $PRIME_TAUX       = 20;  // MAD/heure
-        $PLAFOND_JOUR_MIN = 480; // 8 heures en minutes — le temps passé pris en compte ne peut pas dépasser ce seuil
+        // Taux de prime : 20 DH par heure (ou taux personnalisé en paramètre)
+        $PRIME_TAUX       = $rate > 0 ? $rate : 20;  // MAD/heure
+        $PLAFOND_JOUR_MIN = 480; // 8 heures en minutes (seuil d'éligibilité)
 
         foreach ($techniciens as $tech) {
             $techInterventions = $interventionsCloturees->where('user_id', $tech->id);
@@ -472,55 +472,91 @@ class DirectionController extends Controller
             $tempsPasseMinSum = 0;
             $caTech = 0;
 
-            foreach ($techInterventions as $item) {
-                $item->loadMissing('vehicule.prestations');
-                $bareme = $item->temps_bareme_total;
-                $baremeMinSum += $bareme;
+            // Cumuls spécifiques pour le calcul strict de la prime
+            $baremePrimeMinSum = 0;
+            $tempsPassePrimeMinSum = 0;
+            $nbrInterventionsRetard = 0;
+            $nbrInterventionsPrime = 0;
 
-                // ✅ SOURCE DE VÉRITÉ : Utiliser temps_passe_minutes persisté si disponible.
-                // Fallback sur le calcul dynamique date_debut->date_fin pour les anciens enregistrements.
-                if ($item->temps_passe_minutes > 0) {
-                    $tempsPasse = (int) $item->temps_passe_minutes;
-                } elseif ($item->date_debut && $item->date_fin) {
-                    $tempsPasse = max(1, (int) round(Carbon::parse($item->date_debut)->diffInMinutes(Carbon::parse($item->date_fin))));
-                } elseif ($item->date_debut) {
-                    $tempsPasse = max(1, (int) round(Carbon::parse($item->date_debut)->diffInMinutes($item->updated_at)));
+            foreach ($techInterventions as $intervention) {
+                $intervention->loadMissing('vehicule.prestations');
+
+                // 1. Unification des temps en minutes
+                $bareme = (int) ($intervention->temps_bareme_total ?? ($intervention->temps_bareme ?: 60));
+                if ($bareme <= 0) {
+                    $bareme = (int) ($intervention->temps_bareme ?: 60);
+                }
+
+                // Récupération sécurisée du temps réel passé en minutes
+                if ($intervention->temps_passe_accumule > 0) {
+                    $tempsPasse = (int) $intervention->temps_passe_accumule;
+                } elseif ($intervention->temps_passe_minutes > 0) {
+                    $tempsPasse = (int) $intervention->temps_passe_minutes;
+                } elseif ($intervention->date_debut && $intervention->date_fin) {
+                    $tempsPasse = max(1, (int) round(Carbon::parse($intervention->date_debut)->diffInMinutes(Carbon::parse($intervention->date_fin))));
+                } elseif ($intervention->date_debut) {
+                    $tempsPasse = max(1, (int) round(Carbon::parse($intervention->date_debut)->diffInMinutes($intervention->updated_at)));
                 } else {
                     $tempsPasse = $bareme;
                 }
+
+                // ✅ Statistiques globales de travail (TOUS les véhicules traités sont comptabilisés)
+                $baremeMinSum += $bareme;
                 $tempsPasseMinSum += $tempsPasse;
 
-                $tarif = $this->getTarifPrestation($item->type_intervention, $prestationsMap);
+                $tarif = $this->getTarifPrestation($intervention->type_intervention, $prestationsMap);
                 $caTech += $tarif;
+
+                // 2. ─── RÈGLE MÉTIER STRICTE : EXCLUSION DES INTERVENTIONS EN RETARD POUR LA PRIME ───
+                // Si le technicien prend du retard sur une intervention (temps réel passé > temps barémé),
+                // ce ticket DOIT être totalement exclu du calcul de sa prime :
+                // - Il ne compte pas pour atteindre le seuil des 8h (480 min)
+                // - Son temps n'est pas additionné dans la base de prime
+                $tempsPasseAccumule = $intervention->temps_passe_accumule > 0 ? (int) $intervention->temps_passe_accumule : $tempsPasse;
+                $tempsBareme = $intervention->temps_bareme > 0 ? (int) $intervention->temps_bareme : $bareme;
+
+                if ($tempsPasseAccumule > $tempsBareme) {
+                    $nbrInterventionsRetard++;
+                    continue; // ⚠️ Le ticket en retard est ignoré pour la prime
+                }
+
+                // Seuls les tickets où le technicien a respecté ou battu le barème
+                // ($tempsPasseAccumule <= $tempsBareme) sont sommés pour le seuil et la base de prime
+                $baremePrimeMinSum += $tempsBareme;
+                $tempsPassePrimeMinSum += $tempsPasseAccumule;
+                $nbrInterventionsPrime++;
             }
 
             $tempsBaremeH = round($baremeMinSum / 60, 2);
             $tempsPasseH  = round($tempsPasseMinSum / 60, 2);
 
-            // ─── NOUVELLE RÈGLE MÉTIER DE LA PRIME ───────────────────────────────────────────────
+            // ─── CALCUL FINAL DE LA PRIME DE PERFORMANCE ─────────────────────────────────────────
             //
             // CONDITION DE DÉBLOCAGE : Le technicien ne débloque sa prime QUE SI
-            // la somme de ses temps barémés (Temps Facturé) dépasse 8 heures (480 min).
+            // la somme de ses temps barémés SUR LES INTERVENTIONS ÉLIGIBLES (sans retard)
+            // dépasse le seuil des 8 heures (480 min).
             //
-            //   if (baremeTotal > 480) {
-            //       base_prime_minutes = tempsPasseMinSum  ← Temps Réel Passé
+            //   if (baremePrimeMinSum > 480) {
+            //       base_prime_minutes = tempsPassePrimeMinSum  ← Somme des temps réels des tickets éligibles
             //   } else {
-            //       base_prime_minutes = 0                ← Seuil non atteint
+            //       base_prime_minutes = 0                     ← Seuil non atteint
             //   }
             //
             //   prime_montant = (base_prime_minutes / 60) * PRIME_TAUX
             //
-            if ($baremeMinSum > 480) {
-                $basePrimeMin = $tempsPasseMinSum;
+            $seuilDepasse = $baremePrimeMinSum > 480;
+
+            if ($seuilDepasse) {
+                $basePrimeMin = $tempsPassePrimeMinSum;
             } else {
-                $basePrimeMin = 0; // Seuil 8h non atteint — aucune prime
+                $basePrimeMin = 0; // Seuil 8h non atteint sur les interventions éligibles
             }
 
             $basePrimeH   = round($basePrimeMin / 60, 4);
             $primeMontant = round($basePrimeH * $PRIME_TAUX, 2);
-            // ──────────────────────────────────────────────────────────────────────────────
+            // ─────────────────────────────────────────────────────────────────────────────────────
 
-            // Indicateurs d'efficacité (indépendants de la prime)
+            // Indicateurs d'efficacité (calculés sur l'ensemble des tickets de la période)
             $heuresGagnees = round($tempsBaremeH - $tempsPasseH, 2);
             $heuresPerdues = $heuresGagnees < 0 ? abs($heuresGagnees) : 0;
 
@@ -547,27 +583,33 @@ class DirectionController extends Controller
                 ->count();
 
             $performancesTechniciens[] = [
-                'id'                      => $tech->id,
-                'nom'                     => $tech->name,
-                'email'                   => $tech->email,
-                'nbr_vehicules_traites'   => $nbrVehiculesTraites,
-                'interventions_cloturees' => $countCloturees,
-                'nombre_retours'          => $nombreRetours,
-                'temps_bareme_minutes'    => $baremeMinSum,
-                'temps_bareme_heures'     => $tempsBaremeH,
-                'temps_passe_minutes'     => $tempsPasseMinSum,
-                'temps_passe_heures'      => $tempsPasseH,
-                'heures_gagnees'          => max(0, $heuresGagnees),
-                'heures_perdues'          => $heuresPerdues,
-                // ✅ Nouvelle règle prime : base = temps_passe_reel si barème > 8h, sinon 0
-                'seuil_depasse'           => $baremeMinSum > 480,
-                'base_prime_minutes'      => $basePrimeMin,
-                'base_prime_heures'       => round($basePrimeH, 2),
-                'taux_efficacite'         => $tauxEfficacite,
-                'prime_montant'           => $primeMontant,
-                'prime_formatted'         => number_format($primeMontant, 2, ',', ' ') . ' MAD',
-                'ca_genere'               => $caTech,
-                'ca_genere_formatted'     => number_format($caTech, 2, ',', ' ') . ' MAD',
+                'id'                         => $tech->id,
+                'nom'                        => $tech->name,
+                'email'                      => $tech->email,
+                'nbr_vehicules_traites'      => $nbrVehiculesTraites,
+                'interventions_cloturees'    => $countCloturees,
+                'nombre_retours'             => $nombreRetours,
+                'temps_bareme_minutes'       => $baremeMinSum,
+                'temps_bareme_heures'        => $tempsBaremeH,
+                'temps_passe_minutes'        => $tempsPasseMinSum,
+                'temps_passe_heures'         => $tempsPasseH,
+                'heures_gagnees'             => max(0, $heuresGagnees),
+                'heures_perdues'             => $heuresPerdues,
+                // ✅ Règle d'éligibilité prime avec exclusion des retards
+                'seuil_depasse'              => $seuilDepasse,
+                'base_prime_minutes'         => $basePrimeMin,
+                'base_prime_heures'          => round($basePrimeH, 2),
+                'temps_bareme_prime_minutes' => $baremePrimeMinSum,
+                'temps_bareme_prime_heures'  => round($baremePrimeMinSum / 60, 2),
+                'temps_passe_prime_minutes'  => $tempsPassePrimeMinSum,
+                'temps_passe_prime_heures'   => round($tempsPassePrimeMinSum / 60, 2),
+                'nbr_interventions_retard'   => $nbrInterventionsRetard,
+                'nbr_interventions_prime'    => $nbrInterventionsPrime,
+                'taux_efficacite'            => $tauxEfficacite,
+                'prime_montant'              => $primeMontant,
+                'prime_formatted'            => number_format($primeMontant, 2, ',', ' ') . ' MAD',
+                'ca_genere'                  => $caTech,
+                'ca_genere_formatted'        => number_format($caTech, 2, ',', ' ') . ' MAD',
             ];
         }
 
