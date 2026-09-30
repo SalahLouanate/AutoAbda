@@ -146,17 +146,20 @@ export default function PerformancesRentabiliteView() {
     if (!bilanData?.performances_techniciens) return []
 
     return bilanData.performances_techniciens.map((tech) => {
-      const tempsVenduBareme = tech.temps_bareme_heures   || 0
-      const tempsPasseReel   = tech.temps_passe_heures    || 0
-      // ✅ Nouvelle règle : base prime = temps réel passé SI barème > 8h, sinon 0
-      const basePrimeHeures  = tech.base_prime_heures     ?? 0
-      const seuilDepasse     = tech.seuil_depasse         ?? (tech.temps_bareme_minutes > 480)
-      const heuresSup        = tech.heures_gagnees        || 0
-      const penaliteSAV      = tech.heures_perdues        || 0
-      const bilanNet         = Number((heuresSup - penaliteSAV).toFixed(2))
+      const tempsVenduBareme    = tech.temps_bareme_heures   || 0
+      const tempsPasseReel      = tech.temps_passe_heures    || 0
+      // ✅ Base prime = temps réel passé des tickets validés (sans retard) SI barème éligible > 8h
+      const basePrimeHeures     = tech.base_prime_heures     ?? 0
+      const seuilDepasse        = tech.seuil_depasse         ?? (tech.temps_bareme_minutes > 480)
+      const heuresSup           = tech.heures_gagnees        || 0
+      const penaliteSAV         = tech.heures_perdues        || 0
+      const bilanNet            = Number((heuresSup - penaliteSAV).toFixed(2))
       const nbrVehiculesTraites = tech.nbr_vehicules_traites ?? tech.interventions_cloturees ?? 0
-      const prime            = tech.prime_montant         || 0
-      const nombreRetours    = tech.nombre_retours        || 0
+      const prime               = tech.prime_montant         || 0
+      const nombreRetours       = tech.nombre_retours        || 0
+      const tauxRentabilite     = tech.taux_rentabilite      ?? 0
+      const tauxOccupation      = tech.taux_occupation       ?? 0
+      const heuresValideesPrime = tech.heures_validees_prime ?? tech.base_prime_heures ?? 0
 
       return {
         id: tech.id,
@@ -164,6 +167,9 @@ export default function PerformancesRentabiliteView() {
         nbrVehiculesTraites,
         heuresAchetees: tempsVenduBareme,
         heuresFacturees: tempsPasseReel,
+        tauxRentabilite,
+        tauxOccupation,
+        heuresValideesPrime,
         basePrimeHeures,
         seuilDepasse,
         heuresSup,
@@ -178,14 +184,28 @@ export default function PerformancesRentabiliteView() {
     })
   }, [bilanData])
 
-  const totalVehicules  = useMemo(() => Number(bilanData?.kpis_globaux?.total_vehicules_traites ?? bilanData?.kpis_globaux?.total_interventions ?? donneesActuelles.reduce((s, t) => s + (t.nbrVehiculesTraites || 0), 0)), [bilanData, donneesActuelles])
-  const totalAchetees   = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
-  const totalFacturees  = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
-  const totalPrime      = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
-  const tauxEfficacite  = useMemo(() => Math.round(bilanData?.kpis_globaux?.taux_efficacite_global ?? 0), [bilanData])
-  const totalBilanNet   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.bilanNet, 0).toFixed(2)), [donneesActuelles])
-  const totalMalusSAV   = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0).toFixed(2)), [donneesActuelles])
-  const totalRetoursSAV = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.nombreRetours, 0)), [donneesActuelles])
+  const totalVehicules        = useMemo(() => Number(bilanData?.kpis_globaux?.total_vehicules_traites ?? bilanData?.kpis_globaux?.total_interventions ?? donneesActuelles.reduce((s, t) => s + (t.nbrVehiculesTraites || 0), 0)), [bilanData, donneesActuelles])
+  const totalAchetees         = useMemo(() => Number((bilanData?.kpis_globaux?.temps_bareme_total ?? donneesActuelles.reduce((s, t) => s + t.heuresAchetees, 0)).toFixed(2)), [bilanData, donneesActuelles])
+  const totalFacturees        = useMemo(() => Number((bilanData?.kpis_globaux?.temps_passe_total ?? donneesActuelles.reduce((s, t) => s + t.heuresFacturees, 0)).toFixed(2)), [bilanData, donneesActuelles])
+  const totalPrime            = useMemo(() => bilanData?.kpis_globaux?.total_primes_distribuees ?? donneesActuelles.reduce((s, t) => s + t.prime, 0), [bilanData, donneesActuelles])
+  const tauxEfficacite        = useMemo(() => Math.round(bilanData?.kpis_globaux?.taux_efficacite_global ?? 0), [bilanData])
+  const totalBilanNet         = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.bilanNet, 0).toFixed(2)), [donneesActuelles])
+  const totalMalusSAV         = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.penaliteSAV, 0).toFixed(2)), [donneesActuelles])
+  const totalRetoursSAV       = useMemo(() => Number(donneesActuelles.reduce((s, t) => s + t.nombreRetours, 0)), [donneesActuelles])
+  const tauxRentabiliteGlobal = useMemo(() => {
+    if (bilanData?.kpis_globaux?.taux_rentabilite_global !== undefined) {
+      return Math.round(bilanData.kpis_globaux.taux_rentabilite_global)
+    }
+    const totalPresenceH = bilanData?.kpis_globaux?.capacite_theorique_heures ?? 0
+    return totalPresenceH > 0 ? Math.round((totalAchetees / totalPresenceH) * 100) : 0
+  }, [bilanData, totalAchetees])
+  const tauxOccupationGlobal  = useMemo(() => {
+    if (bilanData?.kpis_globaux?.taux_occupation_global !== undefined) {
+      return Math.round(bilanData.kpis_globaux.taux_occupation_global)
+    }
+    const totalPresenceH = bilanData?.kpis_globaux?.capacite_theorique_heures ?? 0
+    return totalPresenceH > 0 ? Math.round((totalFacturees / totalPresenceH) * 100) : 0
+  }, [bilanData, totalFacturees])
 
   const chartData = useMemo(() => {
     return donneesActuelles.map((t) => ({
@@ -417,6 +437,12 @@ export default function PerformancesRentabiliteView() {
                   <th scope="col" className="py-3.5 px-3 text-center text-slate-700 font-extrabold whitespace-nowrap">
                     Temps Passé (Réel)
                   </th>
+                  <th scope="col" className="py-3.5 px-3 text-center text-slate-700 font-extrabold whitespace-nowrap">
+                    TAUX D'OCCUPATION
+                  </th>
+                  <th scope="col" className="py-3.5 px-3 text-center text-slate-700 font-extrabold whitespace-nowrap">
+                    TAUX DE RENTABILITÉ
+                  </th>
                   <th scope="col" className="py-3.5 px-3 text-center font-bold text-red-700 whitespace-nowrap">Retours SAV</th>
                   <th scope="col" className="py-3.5 pl-3 pr-6 text-right text-violet-700 font-black whitespace-nowrap">Prime (MAD)</th>
                 </tr>
@@ -469,6 +495,26 @@ export default function PerformancesRentabiliteView() {
                       </span>
                     </td>
 
+                    {/* TAUX D'OCCUPATION */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-bold border bg-slate-100/80 text-slate-700 border-slate-200">
+                        {Math.round(tech.tauxOccupation)} %
+                      </span>
+                    </td>
+
+                    {/* TAUX DE RENTABILITÉ */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                        tech.tauxRentabilite >= 100
+                          ? 'bg-green-50 text-green-600 border-green-200 font-bold'
+                          : tech.tauxRentabilite >= 75
+                          ? 'bg-orange-50 text-orange-600 border-orange-200 font-bold'
+                          : 'bg-red-50 text-red-600 border-red-200 font-bold'
+                      }`}>
+                        {Math.round(tech.tauxRentabilite)} %
+                      </span>
+                    </td>
+
                     {/* Retours SAV */}
                     <td className="py-3.5 px-3 text-center whitespace-nowrap">
                       {tech.nombreRetours > 0 ? (
@@ -484,12 +530,22 @@ export default function PerformancesRentabiliteView() {
                     {/* Prime (MAD) */}
                     <td className="py-3.5 pl-3 pr-6 text-right whitespace-nowrap">
                       {tech.prime > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
-                          <IcoStar cls="h-3.5 w-3.5 text-violet-500" />
-                          {tech.primeFormatted || fmtMAD(tech.prime)}
-                        </span>
+                        <div>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
+                            <IcoStar cls="h-3.5 w-3.5 text-violet-500" />
+                            {tech.primeFormatted || fmtMAD(tech.prime)}
+                          </span>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Basé sur {tech.heuresValideesPrime}h validées
+                          </div>
+                        </div>
                       ) : (
-                        <span className="text-xs text-slate-300 font-medium">0 MAD</span>
+                        <div>
+                          <span className="text-xs text-slate-300 font-medium">0 MAD</span>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Basé sur {tech.heuresValideesPrime}h validées
+                          </div>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -511,6 +567,22 @@ export default function PerformancesRentabiliteView() {
                   <td className={`py-4 px-3 text-center font-black text-sm whitespace-nowrap ${totalFacturees <= totalAchetees ? 'text-emerald-700' : 'text-red-700'}`}>
                     {totalFacturees}h
                   </td>
+                  {/* Taux d'occupation global */}
+                  <td className="py-4 px-3 text-center font-black text-xs text-slate-700 whitespace-nowrap">
+                    <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                      {tauxOccupationGlobal} %
+                    </span>
+                  </td>
+                  {/* Taux de rentabilité global */}
+                  <td className="py-4 px-3 text-center font-black text-xs whitespace-nowrap">
+                    <span className={`inline-block px-2.5 py-1 rounded-lg border ${
+                      tauxRentabiliteGlobal >= 100
+                        ? 'bg-green-50 text-green-600 border-green-200'
+                        : 'bg-orange-50 text-orange-600 border-orange-200'
+                    }`}>
+                      {tauxRentabiliteGlobal} %
+                    </span>
+                  </td>
                   <td className={`py-4 px-3 text-center font-black text-xs whitespace-nowrap ${totalRetoursSAV > 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
                     {totalRetoursSAV > 0 ? `${totalRetoursSAV} SAV` : '0'}
                   </td>
@@ -527,11 +599,11 @@ export default function PerformancesRentabiliteView() {
             <div className="flex items-center gap-2 text-violet-950 font-semibold">
               <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-pulse shrink-0" />
               <span>
-                💡 <strong>Règle de Prime :</strong> Prime débloquée uniquement si <strong>Temps Barémé &gt; 8h</strong>. Base = Temps Réel Passé.
+                💡 <strong>Règle de Prime :</strong> Prime débloquée uniquement si <strong>Temps Barémé &gt; 8h</strong> (tickets sans retard). Base = Heures validées.
               </span>
             </div>
             <div className="text-violet-800 font-bold bg-white px-3 py-1.5 rounded-xl border border-violet-200 shadow-2xs">
-              Prime = Temps Réel Passé (si Barème &gt; 480 min) × {tauxCommission} MAD/h
+              Prime = Heures Validées (si Barème &gt; 480 min) × {tauxCommission} MAD/h
             </div>
           </div>
 

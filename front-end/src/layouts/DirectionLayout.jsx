@@ -55,7 +55,7 @@ export default function DirectionLayout() {
           </div>
         </div>
 
-        <div className="px-4 sm:px-8 py-8 max-w-6xl mx-auto">
+        <div className="px-4 sm:px-8 py-8 max-w-7xl mx-auto">
           <Routes>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<DashboardDirectionView />} />

@@ -457,6 +457,18 @@ class DirectionController extends Controller
         $tempsPasseGlobalMin = 0;
         $totalPrimesDistribuees = 0;
 
+        // ─── Calcul du nombre de jours travaillés sur la période ───
+        if ($isTodayMode) {
+            $joursTravailles = 1;
+        } else {
+            $joursTravailles = $interventionsCloturees
+                ->filter(fn($i) => !is_null($i->created_at))
+                ->map(fn($i) => Carbon::parse($i->created_at)->toDateString())
+                ->unique()
+                ->count();
+            $joursTravailles = max(1, $joursTravailles);
+        }
+
         $performancesTechniciens = [];
 
         // Taux de prime : 20 DH par heure (ou taux personnalisé en paramètre)
@@ -554,6 +566,24 @@ class DirectionController extends Controller
 
             $basePrimeH   = round($basePrimeMin / 60, 4);
             $primeMontant = round($basePrimeH * $PRIME_TAUX, 2);
+            $heuresValideesPrime = round($basePrimeMin / 60, 2);
+            // ─────────────────────────────────────────────────────────────────────────────────────
+
+            // ─── CALCUL DES KPIs GARAGE (OBJECTIF 8H/JOUR) ────────────────────────────────────────
+            // Temps de présence théorique : jours_travailles * 480 minutes
+            $presenceTheoriqueMin = $joursTravailles * 480;
+
+            // 1. Taux de rentabilité (%) : capacité à facturer 8h/jour
+            // Formule : (temps_bareme_total_minutes / (jours_travailles * 480)) * 100
+            $tauxRentabilite = ($joursTravailles > 0 && $presenceTheoriqueMin > 0)
+                ? round(($baremeMinSum / $presenceTheoriqueMin) * 100, 1)
+                : 0.0;
+
+            // 2. Taux d'occupation (%) : temps réel passé à travailler vs 8h de présence
+            // Formule : (temps_passe_total_minutes / (jours_travailles * 480)) * 100
+            $tauxOccupation = ($joursTravailles > 0 && $presenceTheoriqueMin > 0)
+                ? round(($tempsPasseMinSum / $presenceTheoriqueMin) * 100, 1)
+                : 0.0;
             // ─────────────────────────────────────────────────────────────────────────────────────
 
             // Indicateurs d'efficacité (calculés sur l'ensemble des tickets de la période)
@@ -599,6 +629,9 @@ class DirectionController extends Controller
                 'seuil_depasse'              => $seuilDepasse,
                 'base_prime_minutes'         => $basePrimeMin,
                 'base_prime_heures'          => round($basePrimeH, 2),
+                'heures_validees_prime'      => $heuresValideesPrime,
+                'taux_rentabilite'           => $tauxRentabilite,
+                'taux_occupation'            => $tauxOccupation,
                 'temps_bareme_prime_minutes' => $baremePrimeMinSum,
                 'temps_bareme_prime_heures'  => round($baremePrimeMinSum / 60, 2),
                 'temps_passe_prime_minutes'  => $tempsPassePrimeMinSum,
@@ -618,21 +651,7 @@ class DirectionController extends Controller
         $tempsGagneGlobalH  = max(0, round($tempsBaremeGlobalH - $tempsPasseGlobalH, 2));
 
         // ─── Calcul de l'Efficacité Globale (Bilan Mensuel) ───
-        // 1. Capacité théorique totale = (Nombre de techniciens) × (8 heures = 480 min) × (Nombre de jours travaillés dans le mois)
-        // 2. Temps de travail réel = Somme des durées de toutes les interventions terminées sur cette période ($tempsPasseGlobalMin)
-        // 3. Efficacité Globale (%) = (Temps de travail réel / Capacité théorique totale) × 100 (arrondi à l'entier le plus proche)
         $nombreTechniciens = $techniciens->count();
-
-        if ($isTodayMode) {
-            $joursTravailles = 1;
-        } else {
-            $joursTravailles = $interventionsCloturees
-                ->filter(fn($i) => !is_null($i->created_at))
-                ->map(fn($i) => Carbon::parse($i->created_at)->toDateString())
-                ->unique()
-                ->count();
-            $joursTravailles = max(1, $joursTravailles);
-        }
 
         // Capacité théorique en minutes : 8 heures/jour/technicien = 480 minutes/jour/technicien
         $capaciteTheoriqueTotalMin = $nombreTechniciens * 480 * $joursTravailles;
@@ -640,6 +659,14 @@ class DirectionController extends Controller
 
         // Calcul de l'efficacité globale (%) arrondie à l'entier le plus proche (ex: 85%)
         $tauxEfficaciteGlobal = $capaciteTheoriqueTotalMin > 0
+            ? (int) round(($tempsPasseGlobalMin / $capaciteTheoriqueTotalMin) * 100)
+            : 0;
+
+        $tauxRentabiliteGlobal = $capaciteTheoriqueTotalMin > 0
+            ? (int) round(($tempsBaremeGlobalMin / $capaciteTheoriqueTotalMin) * 100)
+            : 0;
+
+        $tauxOccupationGlobal = $capaciteTheoriqueTotalMin > 0
             ? (int) round(($tempsPasseGlobalMin / $capaciteTheoriqueTotalMin) * 100)
             : 0;
 
@@ -663,6 +690,8 @@ class DirectionController extends Controller
                 'jours_travailles'           => $joursTravailles,
                 'capacite_theorique_heures'  => $capaciteTheoriqueTotalH,
                 'taux_efficacite_global'     => $tauxEfficaciteGlobal,
+                'taux_rentabilite_global'    => $tauxRentabiliteGlobal,
+                'taux_occupation_global'     => $tauxOccupationGlobal,
                 'total_primes_distribuees'   => $totalPrimesDistribuees,
                 'total_primes_formatted'     => number_format($totalPrimesDistribuees, 2, ',', ' ') . ' MAD',
             ],
