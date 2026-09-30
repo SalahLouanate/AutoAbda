@@ -536,14 +536,14 @@ export default function PerformancesRentabiliteView() {
                             {tech.primeFormatted || fmtMAD(tech.prime)}
                           </span>
                           <div className="text-xs text-gray-500 mt-1">
-                            Basé sur {tech.heuresValideesPrime}h validées
+                            Basé sur {tech.heuresValideesPrime}h gagnées
                           </div>
                         </div>
                       ) : (
                         <div>
                           <span className="text-xs text-slate-300 font-medium">0 MAD</span>
                           <div className="text-xs text-gray-500 mt-1">
-                            Basé sur {tech.heuresValideesPrime}h validées
+                            Basé sur {tech.heuresValideesPrime}h gagnées
                           </div>
                         </div>
                       )}
@@ -599,11 +599,11 @@ export default function PerformancesRentabiliteView() {
             <div className="flex items-center gap-2 text-violet-950 font-semibold">
               <span className="w-2.5 h-2.5 rounded-full bg-violet-600 animate-pulse shrink-0" />
               <span>
-                💡 <strong>Règle de Prime :</strong> Prime débloquée uniquement si <strong>Temps Barémé &gt; 8h</strong> (tickets sans retard). Base = Heures validées.
+                💡 <strong>Règle de Prime :</strong> Prime calculée sur le <strong>Temps Gagné</strong> (Barème - Réel) jour par jour, conditionnée par <strong>Barème &gt; 8h/jour</strong> (tickets sans retard).
               </span>
             </div>
             <div className="text-violet-800 font-bold bg-white px-3 py-1.5 rounded-xl border border-violet-200 shadow-2xs">
-              Prime = Heures Validées (si Barème &gt; 480 min) × {tauxCommission} MAD/h
+              Prime = Temps Gagné Total (si Barème &gt; 480 min/j) × {tauxCommission} MAD/h
             </div>
           </div>
 
