@@ -4,6 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import api from '../../api/axios'
+import ModalDetailsPrimeTechnicien from './ModalDetailsPrimeTechnicien'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -104,6 +105,7 @@ export default function PerformancesRentabiliteView() {
   const [bilanData,        setBilanData]        = useState(null)
   const [loading,          setLoading]          = useState(true)
   const [error,            setError]            = useState(null)
+  const [technicienPourModal, setTechnicienPourModal] = useState(null)
 
   const handleToggle = (nouvelleVue) => {
     setVueActuelle(nouvelleVue)
@@ -180,6 +182,10 @@ export default function PerformancesRentabiliteView() {
         prime,
         primeFormatted: tech.prime_formatted,
         rentable: bilanNet >= 0,
+        // ✅ Données enrichies pour le modal d'audit journalier de prime
+        details_journaliers: tech.details_journaliers || [],
+        total_mensuel_gagne: tech.total_mensuel_gagne ?? 0,
+        total_mensuel_perdu: tech.total_mensuel_perdu ?? 0,
       }
     })
   }, [bilanData])
@@ -444,7 +450,8 @@ export default function PerformancesRentabiliteView() {
                     TAUX DE RENTABILITÉ
                   </th>
                   <th scope="col" className="py-3.5 px-3 text-center font-bold text-red-700 whitespace-nowrap">Retours SAV</th>
-                  <th scope="col" className="py-3.5 pl-3 pr-6 text-right text-violet-700 font-black whitespace-nowrap">Prime (MAD)</th>
+                  <th scope="col" className="py-3.5 pl-3 pr-4 text-right text-violet-700 font-black whitespace-nowrap">Prime (MAD)</th>
+                  <th scope="col" className="py-3.5 px-3 text-center text-slate-700 font-extrabold whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
@@ -528,7 +535,7 @@ export default function PerformancesRentabiliteView() {
                     </td>
 
                     {/* Prime (MAD) */}
-                    <td className="py-3.5 pl-3 pr-6 text-right whitespace-nowrap">
+                    <td className="py-3.5 pl-3 pr-4 text-right whitespace-nowrap">
                       {tech.prime > 0 ? (
                         <div>
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-bold">
@@ -547,6 +554,22 @@ export default function PerformancesRentabiliteView() {
                           </div>
                         </div>
                       )}
+                    </td>
+
+                    {/* ACTION / DÉTAILS */}
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setTechnicienPourModal(tech)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-yellow-50 hover:text-yellow-800 border border-slate-200 hover:border-yellow-300 shadow-2xs transition-all duration-150 cursor-pointer group"
+                        title={`Voir l'audit journalier de prime pour ${tech.nom}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 group-hover:text-yellow-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        </svg>
+                        <span>Détails</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -586,8 +609,11 @@ export default function PerformancesRentabiliteView() {
                   <td className={`py-4 px-3 text-center font-black text-xs whitespace-nowrap ${totalRetoursSAV > 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>
                     {totalRetoursSAV > 0 ? `${totalRetoursSAV} SAV` : '0'}
                   </td>
-                  <td className="py-4 pl-3 pr-6 text-right font-black text-sm text-violet-700 whitespace-nowrap">
+                  <td className="py-4 pl-3 pr-4 text-right font-black text-sm text-violet-700 whitespace-nowrap">
                     {fmtMAD(totalPrime)}
+                  </td>
+                  <td className="py-4 px-3 text-center text-slate-400 text-xs font-bold">
+                    —
                   </td>
                 </tr>
               </tfoot>
@@ -608,6 +634,14 @@ export default function PerformancesRentabiliteView() {
           </div>
 
         </div>
+
+        {/* Modal de Justification et Audit Journalier de Prime */}
+        <ModalDetailsPrimeTechnicien
+          isOpen={Boolean(technicienPourModal)}
+          onClose={() => setTechnicienPourModal(null)}
+          technicien={technicienPourModal}
+          tauxCommission={tauxCommission}
+        />
 
       </div>
     </div>
