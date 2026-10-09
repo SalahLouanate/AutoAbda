@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Intervention extends Model
 {
@@ -55,35 +56,34 @@ class Intervention extends Model
     /**
      * Accessor pour la somme réelle des temps barémés des prestations (en minutes).
      *
-     * Priorité 1 : valeur persistée en colonne `temps_bareme` (calculée côté serveur à la création).
-     * Priorité 2 : calcul dynamique via les prestations liées (fallback pour anciens enregistrements).
+     * Priorité 1 : valeur persistée en colonne `temps_bareme` (calculée côté serveur à la création/mise à jour).
+     *              C'est la SOURCE DE VÉRITÉ UNIQUE. Elle est calculée depuis la table `prestations`
+     *              lors du store/update et est indépendante du pivot `prestation_vehicule`.
+     *
+     * Priorité 2 : calcul via type_intervention (fallback pour anciens enregistrements pré-migration).
+     *              ⚠️ Le pivot prestation_vehicule n'est PAS utilisé comme fallback car il est désormais
+     *                 synchronisé (sync) par ticket actif, ce qui signifie qu'il représente les prestations
+     *                 du DERNIER ticket, pas d'une intervention historique spécifique.
      */
     public function getTempsBaremeTotalAttribute(): int
     {
-        // ✅ PRIORITÉ 1 : Valeur persistée côté serveur — fiable et indépendante du pivot partagé
+        // ✅ PRIORITÉ 1 : Valeur persistée côté serveur — fiable, calculée à la création/update du ticket
         $persisted = isset($this->attributes['temps_bareme']) ? (int) $this->attributes['temps_bareme'] : 0;
         if ($persisted > 0) {
             return $persisted;
         }
 
-        // Fallback : calcul dynamique pour les anciens enregistrements sans colonne persistée
-        if ($this->relationLoaded('vehicule') && $this->vehicule && $this->vehicule->relationLoaded('prestations')) {
-            $sum = (int) $this->vehicule->prestations->sum('temps_bareme');
-            if ($sum > 0) return $sum;
-        }
-
-        if ($this->vehicule_id) {
-            $vehicule = $this->vehicule ?? Vehicule::with('prestations')->find($this->vehicule_id);
-            if ($vehicule && $vehicule->prestations && $vehicule->prestations->count() > 0) {
-                $sum = (int) $vehicule->prestations->sum('temps_bareme');
-                if ($sum > 0) return $sum;
-            }
-        }
-
+        // Priorité 2 (Fallback pour anciens enregistrements sans colonne persistée) :
+        // Recalcul depuis la table `prestations` via les noms stockés dans type_intervention.
+        // On NE passe PAS par le pivot prestation_vehicule qui ne représente que le ticket actif.
         if ($this->type_intervention) {
-            $types = array_map('trim', explode(',', $this->type_intervention));
-            $sum = (int) Prestation::whereIn('nom', $types)->sum('temps_bareme');
-            if ($sum > 0) return $sum;
+            $types = array_values(array_filter(array_map('trim', explode(',', $this->type_intervention))));
+            if (!empty($types)) {
+                $sum = (int) Prestation::whereIn('nom', $types)->sum('temps_bareme');
+                if ($sum > 0) {
+                    return $sum;
+                }
+            }
         }
 
         return 60;
@@ -327,5 +327,13 @@ class Intervention extends Model
     public function pont(): BelongsTo
     {
         return $this->belongsTo(Pont::class);
+    }
+
+    /**
+     * Prestations associées directement à cette intervention (Many-to-Many).
+     */
+    public function prestations(): BelongsToMany
+    {
+        return $this->belongsToMany(Prestation::class, 'intervention_prestation')->withTimestamps();
     }
 }

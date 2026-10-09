@@ -39,8 +39,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('/direction/bilan-mensuel', [DirectionController::class, 'bilanMensuel']);
 
     // Routes Globales Interventions & Tickets
+    Route::post('/interventions', [InterventionController::class, 'store']);
     Route::get('/interventions/{id}', [InterventionController::class, 'show']);
     Route::put('/interventions/{id}', [InterventionController::class, 'update']);
+    Route::post('/tickets', [InterventionController::class, 'store']);
     Route::get('/tickets/{id}', [InterventionController::class, 'show']);
     Route::put('/tickets/{id}', [InterventionController::class, 'update']);
     Route::delete('/tickets/{id}', [ReceptionController::class, 'destroyTicket']);

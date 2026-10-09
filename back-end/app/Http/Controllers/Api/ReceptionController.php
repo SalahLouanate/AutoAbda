@@ -441,25 +441,31 @@ class ReceptionController extends Controller
             ]
         );
 
-        $interventionsList = $validated['interventions'] ?? $request->input('interventions', []);
+        // 🛑 DÉDUPLICATION STRICTE des IDs reçus du front-end (validation garantit qu'ils existent)
+        $interventionsList = array_values(array_unique(array_filter($validated['interventions'] ?? [])));
 
-        // 2. Récupérer les prestations réelles depuis le catalogue DB via ID ou Nom
-        $prestations = Prestation::whereIn('id', $interventionsList)
-            ->orWhereIn('nom', $interventionsList)
-            ->get();
+        // 2. ✅ Récupérer les prestations depuis la table `prestations` par IDs uniquement
+        //    (La validation 'interventions.*' => 'exists:prestations,id' garantit que ce sont des IDs valides)
+        //    On interroge DIRECTEMENT la table — jamais le pivot prestation_vehicule.
+        $prestations = Prestation::whereIn('id', $interventionsList)->get();
 
-        $prestationIds   = $prestations->pluck('id')->toArray();
-        $prestationNames = $prestations->pluck('nom')->toArray();
+        $prestationIds   = $prestations->pluck('id')->unique()->values()->toArray();
+        $prestationNames = $prestations->pluck('nom')->unique()->values()->toArray();
 
-        // Attachement strict dans la table pivot Many-to-Many
+        // ✅ CORRECTION BUG CRITIQUE — sync() au lieu de syncWithoutDetaching() :
+        // syncWithoutDetaching() ACCUMULAIT les prestations de toutes les visites du véhicule,
+        // rendant le pivot inutilisable comme source de calcul (barème gonflé artificiellement).
+        // sync() remplace proprement les prestations pour le ticket actuel.
         if (!empty($prestationIds)) {
-            $vehicule->prestations()->syncWithoutDetaching($prestationIds);
+            $vehicule->prestations()->sync($prestationIds);
+        } else {
+            $vehicule->prestations()->sync([]);
         }
 
         // Formater les prestations sous forme textuelle pour affichage rapide
         $typeInterventionLabel = !empty($prestationNames)
             ? implode(', ', $prestationNames)
-            : implode(', ', $interventionsList);
+            : implode(', ', (array) $validated['interventions']);
 
         // 3. Algorithme d'attribution intelligente du véhicule au technicien
         $modeAttribution = $validated['mode_attribution'] ?? 'auto';
@@ -504,11 +510,13 @@ class ReceptionController extends Controller
             }
         }
 
-        // 4. Calculer le temps barémé total côté serveur (CORRECTION BUG : source de vérité unique, indépendante du pivot)
-        // On additionne les `temps_bareme` de toutes les prestations sélectionnées par la réception.
-        $tempsBaremeTotal = $prestations->sum('temps_bareme');
-        // Fallback : si aucune prestation n'est trouvée, on retombe sur 60 min (défaut métier)
-        if ((int) $tempsBaremeTotal <= 0) {
+        // 4. ✅ CALCUL SERVEUR GARANTI — Source de vérité unique : la table `prestations`
+        //    Jamais le pivot prestation_vehicule (partagé entre plusieurs interventions du même véhicule).
+        //    $prestations est déjà chargé par ID depuis la DB — résultat parfaitement fidèle.
+        $tempsBaremeTotal = (int) $prestations->sum('temps_bareme');
+
+        // Fallback métier : au minimum 60 minutes si les prestations n'ont pas de barème défini
+        if ($tempsBaremeTotal <= 0) {
             $tempsBaremeTotal = 60;
         }
 
@@ -521,11 +529,14 @@ class ReceptionController extends Controller
             'statut'            => 'En attente',
             'is_rdv'            => $isRdv,
             'est_retour_sav'    => $estRetourSav,
-            'temps_bareme'      => (int) $tempsBaremeTotal, // ✅ Persisté en base — calcul serveur garanti
+            'temps_bareme'      => $tempsBaremeTotal, // ✅ Persisté en base — entier en minutes, calcul serveur garanti
         ]);
 
-        // 6. Charger les relations du ticket (technicien, prestations via vehicule)
-        $intervention->load(['technicien', 'vehicule.prestations']);
+        // ✅ NOUVELLE RELATION DIRECTE : synchronisation sur le ticket
+        $intervention->prestations()->sync($prestationIds);
+
+        // 6. Charger les relations du ticket (prestations directes, technicien, prestations via vehicule)
+        $intervention->load(['prestations', 'technicien', 'vehicule.prestations']);
 
         // 7. Déclencher les événements Temps Réel Reverb immédiats
         broadcast(new TicketCreated($intervention));
@@ -587,7 +598,9 @@ class ReceptionController extends Controller
                     }
                 }
 
-                // 2. Détacher les relations pivot (prestation_vehicule) pour éviter des erreurs de clés étrangères
+                // 2. Détacher les relations pivot directes et véhicule
+                $intervention->prestations()->detach();
+
                 if ($intervention->vehicule) {
                     $otherCount = Intervention::where('vehicule_id', $intervention->vehicule_id)
                         ->where('id', '!=', $intervention->id)

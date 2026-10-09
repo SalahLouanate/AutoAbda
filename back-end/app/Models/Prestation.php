@@ -30,4 +30,12 @@ class Prestation extends Model
     {
         return $this->belongsToMany(Vehicule::class, 'prestation_vehicule')->withTimestamps();
     }
+
+    /**
+     * Get all interventions associated with this prestation (Many-to-Many via pivot intervention_prestation).
+     */
+    public function interventions(): BelongsToMany
+    {
+        return $this->belongsToMany(Intervention::class, 'intervention_prestation')->withTimestamps();
+    }
 }

@@ -277,11 +277,11 @@ export default function ModifierInterventionModal({
       }
     }
 
-    // 🛑 PRIORITÉ STRICTE : Une seule source primaire pour éviter les doublons croisés
-    if (Array.isArray(intervention.vehicule?.prestations) && intervention.vehicule.prestations.length > 0) {
-      collectPrestations(intervention.vehicule.prestations)
-    } else if (Array.isArray(intervention.prestations) && intervention.prestations.length > 0) {
+    // 🛑 PRIORITÉ STRICTE : La relation directe intervention.prestations prime désormais sur le véhicule
+    if (Array.isArray(intervention.prestations) && intervention.prestations.length > 0) {
       collectPrestations(intervention.prestations)
+    } else if (Array.isArray(intervention.vehicule?.prestations) && intervention.vehicule.prestations.length > 0) {
+      collectPrestations(intervention.vehicule.prestations)
     } else if (Array.isArray(intervention.interventions) && intervention.interventions.length > 0) {
       collectPrestations(intervention.interventions)
     } else if (Array.isArray(intervention.raw?.vehicule?.prestations) && intervention.raw.vehicule.prestations.length > 0) {
@@ -418,6 +418,7 @@ export default function ModifierInterventionModal({
       immatriculation: immatriculation.trim().toUpperCase(),
       matricule: immatriculation.trim().toUpperCase(),
       marque: marque.trim(),
+      prestations: catalogueIds,
       interventions: catalogueIds.length > 0 ? catalogueIds : selectedPrestations.map((p) => p.nom),
       catalogue_ids: catalogueIds,
       type_intervention: selectedPrestations.map((p) => p.nom).join(', '),
