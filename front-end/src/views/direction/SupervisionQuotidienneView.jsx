@@ -136,8 +136,9 @@ export default function SupervisionQuotidienneView() {
       (item.vehicule?.prestations && item.vehicule.prestations.some((p) => p.est_variable === true))
     )
 
-    const baremeMinutesOfficiel = item.temps_bareme_officiel ?? item.catalogue?.temps_bareme ?? (item.temps_bareme_total ?? item.bareme ?? 60)
-    const baremeMin = isVariable ? 0 : baremeMinutesOfficiel
+    // 🛑 ACTIONS STRICTES : Récupération prioritaire de temps_bareme_total sans forçage à 60
+    const baremeMinutes = Number(item.temps_bareme_total ?? item.temps_bareme ?? item.bareme ?? 0)
+    const baremeMin = isVariable ? 0 : baremeMinutes
     // 🛑 ACTIONS STRICTES : Fallback robuste imposé
     // const tempsPasse = intervention.temps_passe_accumule || intervention.temps_passe_minutes || intervention.temps_passe || 0;
     let tempsPasseMinutes = Number(
@@ -724,7 +725,7 @@ export default function SupervisionQuotidienneView() {
                             <div className="space-y-1.5 pt-1">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="font-semibold text-slate-700">
-                                  Temps passé : {formaterTemps(tempsPasseHeures)} / Barème : {formaterTemps(intervention.tempsBaremeOfficiel ? (intervention.tempsBaremeOfficiel / 60) : intervention.tempsBareme)}
+                                  Temps passé : {formaterTemps(tempsPasseHeures)} / Barème : {formaterTemps(intervention.tempsBareme)}
                                 </span>
                                 {isDepasse ? (
                                   <span className="font-bold text-rose-600 flex items-center gap-1">

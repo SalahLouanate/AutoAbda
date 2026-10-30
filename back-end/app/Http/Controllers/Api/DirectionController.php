@@ -221,7 +221,7 @@ class DirectionController extends Controller
 
             $estEnRetard = !$isVariable && ($item->statut === 'En cours') && ($tempsPasse > $bareme);
 
-            $tempsBaremeOfficiel = $cataloguePrestation ? (int) $cataloguePrestation->temps_bareme : (int) $bareme;
+            $tempsBaremeOfficiel = (int) $bareme;
 
             return [
                 'id'                    => $item->id,
@@ -229,6 +229,7 @@ class DirectionController extends Controller
                 'type_intervention'     => $item->type_intervention,
                 'est_variable'          => (bool) $isVariable,
                 'temps_bareme_officiel' => $tempsBaremeOfficiel,
+                'temps_bareme'          => (int) $bareme,
                 'catalogue'             => $cataloguePrestation ? [
                     'id'           => $cataloguePrestation->id,
                     'nom'          => $cataloguePrestation->nom,

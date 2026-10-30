@@ -441,8 +441,9 @@ export default function GestionInterventions() {
       (item.catalogue && item.catalogue.est_variable === true) ||
       (item.vehicule?.prestations && item.vehicule.prestations.some((p) => p.est_variable === true))
     )
-    const baremeMinutesOfficiel = item.temps_bareme_officiel ?? item.catalogue?.temps_bareme ?? (item.temps_bareme_total ?? item.bareme ?? 60)
-    const baremeMin = isVariable ? 0 : baremeMinutesOfficiel
+    // 🛑 ACTIONS STRICTES : Récupération prioritaire de temps_bareme_total sans forçage à 60
+    const baremeMinutes = Number(item.temps_bareme_total ?? item.temps_bareme ?? item.bareme ?? 0)
+    const baremeMin = isVariable ? 0 : baremeMinutes
     const dateDebutISO = item.started_at || item.date_debut
 
     // ✅ CALCUL CHRONO ACCUMULATEUR STRICT :
@@ -481,7 +482,9 @@ export default function GestionInterventions() {
       motifBlocage: item.motif_blocage,
       motif_blocage: item.motif_blocage,
       tempsBareme: baremeMin / 60,
-      tempsBaremeOfficiel: item.temps_bareme_officiel ?? item.catalogue?.temps_bareme,
+      baremeMin,
+      tempsBaremeTotal: baremeMin,
+      tempsBaremeOfficiel: baremeMin,
       catalogue: item.catalogue,
       tempsPasse: tempsPasseMin / 60,
       startedAt: dateDebutISO,
@@ -832,8 +835,12 @@ export default function GestionInterventions() {
                         intervention.estVariable === true ||
                         (intervention.catalogue && intervention.catalogue.est_variable === true)
                       )
-                      const isDepasse = !isVariable && intervention.tempsPasse > intervention.tempsBareme
-                      const pourcent = isVariable ? 0 : Math.min(Math.round((intervention.tempsPasse / (intervention.tempsBareme || 1)) * 100), 100)
+                      const isDepasse = !isVariable && intervention.tempsBareme > 0 && intervention.tempsPasse > intervention.tempsBareme
+                      const pourcent = isVariable
+                        ? 0
+                        : intervention.tempsBareme > 0
+                        ? Math.min(Math.round((intervention.tempsPasse / intervention.tempsBareme) * 100), 100)
+                        : 0
                       let barColorClass = 'bg-emerald-500'
                       if (isDepasse) barColorClass = 'bg-rose-500'
                       else if (intervention.statut === 'En cours') barColorClass = 'bg-blue-500'
@@ -879,7 +886,7 @@ export default function GestionInterventions() {
                               <div className="space-y-1.5 pt-1">
                                 <div className="flex items-center justify-between text-xs">
                                   <span className="font-semibold text-slate-700">
-                                    {formaterTemps(intervention.tempsPasse)} / {formaterTemps(intervention.tempsBaremeOfficiel ? (intervention.tempsBaremeOfficiel / 60) : intervention.tempsBareme)}
+                                    {formaterTemps(intervention.tempsPasse)} / {formaterTemps(intervention.tempsBareme)}
                                   </span>
                                   {isDepasse ? (
                                     <span className="font-bold text-rose-600 flex items-center gap-1">
