@@ -65,6 +65,7 @@ export default function ModifierInterventionModal({
   intervention,
   onClose,
   onSaved,
+  onUpdate,
 }) {
   // ── Form States (Épuré : uniquement Véhicule, Prestations, Technicien, Motif) ──
   const [immatriculation, setImmatriculation] = useState('')
@@ -385,13 +386,13 @@ export default function ModifierInterventionModal({
   // ── Validation du Formulaire ────────────────────────────────────────────────
   const validateForm = () => {
     const errs = {}
-    if (!immatriculation.trim()) {
+    if (!immatriculation || !immatriculation.trim()) {
       errs.immatriculation = "L'immatriculation du véhicule est requise."
     }
-    if (!marque.trim()) {
+    if (!marque || !marque.trim()) {
       errs.marque = 'La marque et le modèle sont requis.'
     }
-    if (selectedPrestations.length === 0) {
+    if (!selectedPrestations || selectedPrestations.length === 0) {
       errs.prestations = 'Veuillez sélectionner au moins une prestation dans le catalogue.'
     }
     return errs
@@ -402,52 +403,98 @@ export default function ModifierInterventionModal({
     e.preventDefault()
     const formErrors = validateForm()
     if (Object.keys(formErrors).length > 0) {
-      setErrors(formErrors)
+      console.warn("Validation échouée dans ModifierInterventionModal:", formErrors)
+      setErrors({
+        ...formErrors,
+        api: 'Veuillez renseigner tous les champs obligatoires (*).',
+      })
+      return
+    }
+
+    const interventionId = intervention?.id || intervention?.ticket?.id || intervention?.ticket_id
+    if (!interventionId) {
+      console.error("Identifiant d'intervention manquant dans l'objet intervention :", intervention)
+      setErrors({ api: "Identifiant d'intervention introuvable." })
       return
     }
 
     setIsSubmitting(true)
     setErrors({})
 
-    // Extraction des IDs d'interventions
-    const catalogueIds = selectedPrestations
-      .map((item) => item.value)
-      .filter((v) => v !== undefined && v !== null && !String(v).startsWith('custom-'))
+    // 1. VÉRIFICATION DU PAYLOAD : Extraction stricte d'un tableau d'IDs (entiers)
+    const prestationIds = (selectedPrestations || [])
+      .map((item) => {
+        if (typeof item === 'object' && item !== null) {
+          const val = item.value !== undefined ? item.value : item.id
+          const parsed = parseInt(val, 10)
+          if (!isNaN(parsed) && parsed > 0) return parsed
+
+          // Fallback : rechercher par nom dans catalogueList si id non direct
+          const name = item.nom || item.label || item.name
+          if (name && catalogueList.length > 0) {
+            const found = catalogueList.find(
+              (c) => (c.nom || '').trim().toLowerCase() === String(name).trim().toLowerCase()
+            )
+            if (found && found.id) return parseInt(found.id, 10)
+          }
+          return null
+        }
+        const parsed = parseInt(item, 10)
+        return !isNaN(parsed) && parsed > 0 ? parsed : null
+      })
+      .filter((id) => id !== null && Number.isInteger(id) && id > 0)
 
     const payload = {
-      immatriculation: immatriculation.trim().toUpperCase(),
-      matricule: immatriculation.trim().toUpperCase(),
-      marque: marque.trim(),
-      prestations: catalogueIds,
-      interventions: catalogueIds.length > 0 ? catalogueIds : selectedPrestations.map((p) => p.nom),
-      catalogue_ids: catalogueIds,
-      type_intervention: selectedPrestations.map((p) => p.nom).join(', '),
+      immatriculation: (immatriculation || '').trim().toUpperCase(),
+      matricule: (immatriculation || '').trim().toUpperCase(),
+      marque: (marque || '').trim(),
+      prestations: prestationIds,
+      catalogue_ids: prestationIds,
+      interventions: prestationIds,
+      type_intervention: selectedPrestations
+        .map((p) => (typeof p === 'object' && p !== null ? p.nom || p.label || p.name : String(p)))
+        .filter(Boolean)
+        .join(', '),
       technicien_id: technicienId ? parseInt(technicienId, 10) : null,
-      motif_blocage: motifBlocage.trim() || null,
+      motif_blocage: (motifBlocage || '').trim() || null,
     }
 
     try {
-      const response = await api.put(`/interventions/${intervention.id}`, payload)
+      // 2. GESTION DES ERREURS : Appel API avec try/catch robuste
+      const response = await api.put(`/interventions/${interventionId}`, payload)
 
       const updated = response.data?.ticket || response.data?.intervention || {
         ...intervention,
         ...payload,
+        id: interventionId,
         immat: payload.immatriculation,
         technicien: techniciensList.find((t) => String(t.id) === String(technicienId)) || null,
-        interventions: selectedPrestations.map((p) => p.nom),
+        interventions: selectedPrestations.map((p) => (typeof p === 'object' && p !== null ? p.nom || p.label : p)),
         temps_bareme: totalTempsBareme,
       }
 
-      if (onSaved) {
+      // 3. RAFRAÎCHISSEMENT & FERMETURE DU MODAL
+      if (typeof onSaved === 'function') {
         onSaved(updated)
       }
-      onClose()
+      if (typeof onUpdate === 'function') {
+        onUpdate(updated)
+      }
+      if (typeof onClose === 'function') {
+        onClose()
+      }
     } catch (err) {
-      console.error("Erreur lors de l'enregistrement de l'intervention:", err)
-      const errorMsg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        "Une erreur est survenue lors de l'enregistrement des modifications."
+      // Affiche l'erreur complète dans la console pour débogage immédiat
+      console.error("Erreur API PUT /api/interventions:", err.response?.data || err)
+      const errorData = err.response?.data
+      let errorMsg = "Une erreur est survenue lors de l'enregistrement des modifications."
+      if (errorData?.message) {
+        errorMsg = errorData.message
+      } else if (errorData?.error) {
+        errorMsg = errorData.error
+      } else if (errorData?.errors) {
+        errorMsg = Object.values(errorData.errors).flat().join(' ')
+      }
       setErrors({ api: errorMsg })
     } finally {
       setIsSubmitting(false)
