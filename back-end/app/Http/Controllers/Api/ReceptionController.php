@@ -515,11 +515,6 @@ class ReceptionController extends Controller
         //    $prestations est déjà chargé par ID depuis la DB — résultat parfaitement fidèle.
         $tempsBaremeTotal = (int) $prestations->sum('temps_bareme');
 
-        // Fallback métier : au minimum 60 minutes si les prestations n'ont pas de barème défini
-        if ($tempsBaremeTotal <= 0) {
-            $tempsBaremeTotal = 60;
-        }
-
         // 5. Créer le ticket d'intervention avec le barème persisté en base (valeur calculée serveur)
         $intervention = Intervention::create([
             'vehicule_id'       => $vehicule->id,

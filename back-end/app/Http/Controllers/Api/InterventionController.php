@@ -80,10 +80,6 @@ class InterventionController extends Controller
             ? (int) Prestation::whereIn('id', $prestationIds)->sum('temps_bareme')
             : 0;
 
-        if ($total_bareme <= 0 && !empty($prestationIds)) {
-            $total_bareme = 60;
-        }
-
         // D. Enregistre cette valeur en dur : $intervention->temps_bareme = $total_bareme;
         $intervention->temps_bareme = $total_bareme;
 
@@ -108,8 +104,12 @@ class InterventionController extends Controller
         // Assure-toi que la réponse JSON renvoyée au Front-end inclut bien la relation prestations chargée
         $intervention->load(['prestations', 'vehicule.prestations', 'technicien', 'user', 'pont']);
 
-        broadcast(new TicketCreated($intervention));
-        broadcast(new NewVehicleArrived($intervention));
+        try {
+            broadcast(new TicketCreated($intervention));
+            broadcast(new NewVehicleArrived($intervention));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Échec de diffusion Reverb (store ticket) : ' . $e->getMessage());
+        }
 
         return response()->json([
             'status'       => 'success',
@@ -199,42 +199,62 @@ class InterventionController extends Controller
                 $vehicule->save();
             }
 
-            // ── 2. NOUVELLE LOGIQUE OBLIGATOIRE : Prestations & Recalcul du Temps Barémé ──
-            // A. Récupère les IDs des prestations envoyées par la requête React ($request->prestations)
-            $rawPrestations = $request->input('prestations')
-                ?? $request->input('interventions')
-                ?? $request->input('catalogue_ids');
+            // ── 2. NOUVELLE LOGIQUE STRICTE : Prestations & Recalcul du Temps Barémé ──
+            $rawPrestations = $request->input('prestations', $request->input('catalogue_ids', $request->input('interventions')));
 
-            if ($rawPrestations !== null && is_array($rawPrestations)) {
-                // 🛑 DÉDUPLICATION STRICTE des IDs / noms reçus du front-end
-                $prestationsIdsOrNames = array_values(array_unique(array_filter($rawPrestations)));
-
-                $numericIds = array_filter($prestationsIdsOrNames, 'is_numeric');
-                $stringNames = array_filter($prestationsIdsOrNames, fn($v) => !is_numeric($v));
-
-                $prestations = Prestation::query()
-                    ->when(!empty($numericIds), fn($q) => $q->orWhereIn('id', $numericIds))
-                    ->when(!empty($stringNames), fn($q) => $q->orWhereIn('nom', $stringNames))
-                    ->get()
-                    ->unique('id');
-
-                $prestationIds = $prestations->pluck('id')->all();
-
-                // B. Utilise $intervention->prestations()->sync($request->prestations);
-                // (La synchronisation se fait désormais sur le ticket, c'est propre et sécurisé)
-                $intervention->prestations()->sync($prestationIds);
-
-                // C. Requête la base pour additionner le temps (les temps_bareme sont en minutes)
-                $total_bareme = (int) Prestation::whereIn('id', $prestationIds)->sum('temps_bareme');
-                if ($total_bareme <= 0 && $prestations->isNotEmpty()) {
-                    $total_bareme = 60;
+            if ($rawPrestations !== null) {
+                if (is_string($rawPrestations)) {
+                    $rawPrestations = array_filter(explode(',', $rawPrestations));
                 }
 
-                // D. Enregistre cette valeur en dur : $intervention->temps_bareme = $total_bareme;
-                $intervention->temps_bareme = $total_bareme;
-                $intervention->type_intervention = implode(', ', $prestations->pluck('nom')->unique()->values()->toArray());
+                $prestationsList = is_array($rawPrestations) ? $rawPrestations : [$rawPrestations];
 
-                // Rétrocompatibilité temporaire pivot véhicule
+                // Extraire IDs et/ou noms reçus
+                $extractedIds = [];
+                $extractedNames = [];
+                foreach ($prestationsList as $item) {
+                    if (is_array($item) && isset($item['id'])) {
+                        $extractedIds[] = $item['id'];
+                    } elseif (is_object($item) && isset($item->id)) {
+                        $extractedIds[] = $item->id;
+                    } elseif (is_numeric($item)) {
+                        $extractedIds[] = (int) $item;
+                    } elseif (is_string($item) && trim($item) !== '') {
+                        $extractedNames[] = trim($item);
+                    }
+                }
+
+                $prestationModels = Prestation::query()
+                    ->when(!empty($extractedIds), fn($q) => $q->orWhereIn('id', $extractedIds))
+                    ->when(!empty($extractedNames), fn($q) => $q->orWhereIn('nom', $extractedNames))
+                    ->get();
+
+                $prestationIds = $prestationModels->pluck('id')->toArray();
+
+                // A. Synchronise les nouvelles prestations : $intervention->prestations()->sync($request->prestations);
+                $intervention->prestations()->sync($prestationIds);
+
+                // B. Recalcule le total depuis la base : $nouveau_temps = Prestation::whereIn('id', $request->prestations)->sum('temps_bareme');
+                $nouveau_temps = !empty($prestationIds)
+                    ? (int) Prestation::whereIn('id', $prestationIds)->sum('temps_bareme')
+                    : 0;
+
+                // C. Applique la conversion (si le catalogue est en heures et l'intervention en minutes, multiplie par 60).
+                // Note : Dans la base, temps_bareme est déjà en minutes (ex: 30, 45, 60, 300).
+                $nouveau_temps = (int) $nouveau_temps;
+
+                // D. Sauvegarde en dur : $intervention->temps_bareme = $nouveau_temps; $intervention->save();
+                $intervention->temps_bareme = $nouveau_temps;
+
+                if ($prestationModels->isNotEmpty()) {
+                    $intervention->type_intervention = implode(', ', $prestationModels->pluck('nom')->unique()->values()->toArray());
+                } elseif ($request->filled('type_intervention')) {
+                    $intervention->type_intervention = trim($request->input('type_intervention'));
+                }
+
+                $intervention->save();
+
+                // Rétrocompatibilité pivot véhicule
                 if ($vehicule) {
                     $vehicule->prestations()->sync($prestationIds);
                 }
@@ -245,24 +265,25 @@ class InterventionController extends Controller
                 $numericParts = array_filter($parts, 'is_numeric');
                 $nameParts    = array_filter($parts, fn($v) => !is_numeric($v));
 
-                $prestations = Prestation::query()
+                $prestationModels = Prestation::query()
                     ->when(!empty($numericParts), fn($q) => $q->orWhereIn('id', $numericParts))
                     ->when(!empty($nameParts),    fn($q) => $q->orWhereIn('nom', $nameParts))
-                    ->get()
-                    ->unique('id');
+                    ->get();
 
-                if ($prestations->isNotEmpty()) {
-                    $prestationIds = $prestations->pluck('id')->all();
+                if ($prestationModels->isNotEmpty()) {
+                    $prestationIds = $prestationModels->pluck('id')->toArray();
                     $intervention->prestations()->sync($prestationIds);
-                    $total_bareme = (int) Prestation::whereIn('id', $prestationIds)->sum('temps_bareme');
-                    $intervention->temps_bareme = $total_bareme > 0 ? $total_bareme : 60;
-                    $intervention->type_intervention = implode(', ', $prestations->pluck('nom')->unique()->values()->toArray());
+                    $nouveau_temps = (int) Prestation::whereIn('id', $prestationIds)->sum('temps_bareme');
+                    $intervention->temps_bareme = $nouveau_temps;
+                    $intervention->type_intervention = implode(', ', $prestationModels->pluck('nom')->unique()->values()->toArray());
+                    $intervention->save();
 
                     if ($vehicule) {
                         $vehicule->prestations()->sync($prestationIds);
                     }
                 } else {
                     $intervention->type_intervention = implode(', ', $parts);
+                    $intervention->save();
                 }
             }
 
@@ -289,8 +310,12 @@ class InterventionController extends Controller
         $intervention->load(['prestations', 'vehicule.prestations', 'technicien', 'user', 'pont']);
 
         // ── 6. Diffusion temps réel Reverb (Atelier + Garage) ──────────────
-        broadcast(new InterventionStatusChanged($intervention));
-        broadcast(new TicketStatusUpdated($intervention));
+        try {
+            broadcast(new InterventionStatusChanged($intervention));
+            broadcast(new TicketStatusUpdated($intervention));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Échec de diffusion Reverb (update ticket) : ' . $e->getMessage());
+        }
 
         // Formatage pour l'interface Réception & Chef
         $nomVehicule = $intervention->vehicule 

@@ -68,9 +68,8 @@ class Intervention extends Model
     public function getTempsBaremeTotalAttribute(): int
     {
         // ✅ PRIORITÉ 1 : Valeur persistée côté serveur — fiable, calculée à la création/update du ticket
-        $persisted = isset($this->attributes['temps_bareme']) ? (int) $this->attributes['temps_bareme'] : 0;
-        if ($persisted > 0) {
-            return $persisted;
+        if (array_key_exists('temps_bareme', $this->attributes) && $this->attributes['temps_bareme'] !== null) {
+            return (int) $this->attributes['temps_bareme'];
         }
 
         // Priorité 2 (Fallback pour anciens enregistrements sans colonne persistée) :
@@ -80,13 +79,11 @@ class Intervention extends Model
             $types = array_values(array_filter(array_map('trim', explode(',', $this->type_intervention))));
             if (!empty($types)) {
                 $sum = (int) Prestation::whereIn('nom', $types)->sum('temps_bareme');
-                if ($sum > 0) {
-                    return $sum;
-                }
+                return $sum;
             }
         }
 
-        return 60;
+        return 0;
     }
 
     /**

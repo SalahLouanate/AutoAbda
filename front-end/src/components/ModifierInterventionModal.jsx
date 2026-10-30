@@ -344,7 +344,7 @@ export default function ModifierInterventionModal({
         const fallbackOpts = rawPrestationsList.map((item) => {
           const nom = typeof item === 'object' && item !== null ? item.nom || item.name : String(item)
           const id = typeof item === 'object' && item !== null && item.id !== undefined ? item.id : `fallback-${nom.toLowerCase()}`
-          return { value: id, label: nom, nom, temps_bareme: item.temps_bareme || 60 }
+          return { value: id, label: nom, nom, temps_bareme: item.temps_bareme !== undefined && item.temps_bareme !== null ? Number(item.temps_bareme) : 0 }
         })
         setSelectedPrestations(deduplicateOptions(fallbackOpts))
       }
@@ -353,7 +353,7 @@ export default function ModifierInterventionModal({
       const tempOpts = rawPrestationsList.map((item) => {
         const nom = typeof item === 'object' && item !== null ? item.nom || item.name : String(item)
         const id = typeof item === 'object' && item !== null && item.id !== undefined ? item.id : `temp-${nom.toLowerCase()}`
-        return { value: id, label: nom, nom, temps_bareme: item.temps_bareme || 60 }
+        return { value: id, label: nom, nom, temps_bareme: item.temps_bareme !== undefined && item.temps_bareme !== null ? Number(item.temps_bareme) : 0 }
       })
       setSelectedPrestations(deduplicateOptions(tempOpts))
     } else {
@@ -375,7 +375,7 @@ export default function ModifierInterventionModal({
     })
 
     return {
-      totalTempsBareme: total > 0 ? total : selectedPrestations.length > 0 ? 60 : 0,
+      totalTempsBareme: total,
       aPrestationVariable: hasVariable,
     }
   }, [selectedPrestations])
